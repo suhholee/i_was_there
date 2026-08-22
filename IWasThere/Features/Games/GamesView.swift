@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct GamesView: View {
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \AttendedGame.gameDate, order: .reverse) private var games: [AttendedGame]
     @Query private var profiles: [UserProfile]
     @State private var showingAddGame = false
@@ -41,7 +42,7 @@ struct GamesView: View {
                     ContentUnavailableView {
                         Label("No games yet", systemImage: "baseball.diamond.bases")
                     } description: {
-                        Text("Log a Final MLB game to pull the box score into your 직관 diary.")
+                        Text("Log a game to your iWasThere Diary!")
                             .foregroundStyle(DesignTokens.secondaryText)
                     } actions: {
                         Button("Add game") { showingAddGame = true }
@@ -99,6 +100,7 @@ struct GamesView: View {
             }
             .sheet(isPresented: $showingAddGame) {
                 AddGameView()
+                    .environment(\.modelContext, modelContext)
             }
         }
     }
@@ -157,7 +159,7 @@ struct GamesView: View {
                         .clipShape(Capsule())
                 }
             }
-            Text("\(game.awayScore)–\(game.homeScore) · \(game.gameDate.formatted(date: .abbreviated, time: .omitted))")
+            Text("\(game.awayScore)–\(game.homeScore) · \(game.localDateTimeLabel)")
                 .font(.subheadline)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
             if !game.eventTitle.isEmpty {

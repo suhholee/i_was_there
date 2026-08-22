@@ -69,6 +69,8 @@ struct MLBScheduleDate: Decodable {
 struct MLBScheduleGame: Decodable {
     let gamePk: Int
     let officialDate: String?
+    /// Absolute first-pitch instant from MLB (ISO8601), e.g. `2024-10-26T00:08:00Z`.
+    let gameDate: String?
     let status: MLBGameStatus
     let teams: MLBScheduleTeams
     let venue: MLBVenue?

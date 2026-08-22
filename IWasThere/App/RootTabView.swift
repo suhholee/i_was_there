@@ -31,6 +31,9 @@ struct RootTabView: View {
         }
         .tint(DesignTokens.accent)
         .preferredColorScheme(.dark)
+        // Ensures the window paints even if a child view fails to layout (e.g. external display).
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DesignTokens.background.ignoresSafeArea())
     }
 }
 

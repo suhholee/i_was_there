@@ -41,12 +41,18 @@ enum BoxscoreImporter {
             throw GameImportError.missingScores
         }
 
-        let gameDate = MLBDateParsing.date(fromOfficial: scheduleGame.officialDate) ?? .now
-        let season = Calendar(identifier: .gregorian).component(.year, from: gameDate)
+        let calendarDay = MLBDateParsing.calendarDate(fromOfficial: scheduleGame.officialDate)
+            ?? MLBDateParsing.calendarDate(fromFirstPitch: scheduleGame.gameDate)
+            ?? Date()
+        let firstPitch = MLBDateParsing.firstPitch(fromISO: scheduleGame.gameDate) ?? calendarDay
+        let season = Calendar.current.component(.year, from: calendarDay)
 
         let game = AttendedGame(
             mlbGamePk: scheduleGame.gamePk,
-            gameDate: gameDate,
+            gameDate: calendarDay,
+            firstPitchAt: firstPitch,
+            officialDateString: scheduleGame.officialDate
+                ?? MLBDateParsing.scheduleQueryDate(from: calendarDay),
             season: season,
             venueName: scheduleGame.venue?.name ?? "",
             homeTeamID: scheduleGame.teams.home.team.id,
@@ -137,25 +143,49 @@ enum BoxscoreImporter {
 }
 
 enum MLBDateParsing {
-    private static let dayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(identifier: "America/New_York") ?? .current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
-
-    static func date(fromOfficial officialDate: String?) -> Date? {
+    /// Interpret MLB `officialDate` (`yyyy-MM-dd`) as that calendar day in the
+    /// **user's current timezone** (noon), so the displayed day never shifts.
+    static func calendarDate(fromOfficial officialDate: String?) -> Date? {
         guard let officialDate else { return nil }
-        return dayFormatter.date(from: officialDate)
+        let parts = officialDate.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        var components = DateComponents()
+        components.year = parts[0]
+        components.month = parts[1]
+        components.day = parts[2]
+        components.hour = 12
+        components.minute = 0
+        components.second = 0
+        return Calendar.current.date(from: components)
+    }
+
+    /// Fallback calendar day from first-pitch ISO, using the user's timezone.
+    static func calendarDate(fromFirstPitch iso: String?) -> Date? {
+        guard let firstPitch = firstPitch(fromISO: iso) else { return nil }
+        let cal = Calendar.current
+        let parts = cal.dateComponents([.year, .month, .day], from: firstPitch)
+        var noon = DateComponents()
+        noon.year = parts.year
+        noon.month = parts.month
+        noon.day = parts.day
+        noon.hour = 12
+        return cal.date(from: noon)
+    }
+
+    static func firstPitch(fromISO iso: String?) -> Date? {
+        guard let iso, !iso.isEmpty else { return nil }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractional.date(from: iso) { return date }
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+        return plain.date(from: iso)
     }
 
     static func scheduleQueryDate(from date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.calendar = Calendar.current
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        // Use the calendar day the user picked in their local timezone.
         formatter.timeZone = .current
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)

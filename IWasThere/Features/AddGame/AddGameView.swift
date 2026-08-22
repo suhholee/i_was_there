@@ -218,24 +218,9 @@ struct AddGameView: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(DesignTokens.primaryText)
 
-                diaryField(
-                    title: "Event / giveaway",
-                    placeholder: "e.g. Shohei Ohtani Bobblehead Night",
-                    text: $viewModel.eventTitle,
-                    axis: .vertical
-                )
-                diaryField(
-                    title: "Companions",
-                    placeholder: "e.g. Sunbin, JR & Hodu",
-                    text: $viewModel.companions,
-                    axis: .vertical
-                )
-                diaryField(
-                    title: "Notes",
-                    placeholder: "Memorable moments, caught ball, Dodger Vision…",
-                    text: $viewModel.note,
-                    axis: .vertical
-                )
+                diaryField(title: "Event/Giveaway", text: $viewModel.eventTitle)
+                diaryField(title: "Friends", text: $viewModel.companions)
+                diaryField(title: "Notes", text: $viewModel.note)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Photos")
@@ -288,22 +273,17 @@ struct AddGameView: View {
         }
     }
 
-    private func diaryField(
-        title: String,
-        placeholder: String,
-        text: Binding<String>,
-        axis: Axis
-    ) -> some View {
+    private func diaryField(title: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(DesignTokens.primaryText)
-            TextField(placeholder, text: text, axis: axis)
+            TextField("", text: text, axis: .vertical)
                 .padding(12)
                 .background(DesignTokens.surface)
                 .foregroundStyle(DesignTokens.primaryText)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .lineLimit(axis == .vertical ? 3...6 : 1...1)
+                .lineLimit(3...6)
         }
     }
 

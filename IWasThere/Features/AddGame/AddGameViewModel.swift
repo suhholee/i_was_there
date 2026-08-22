@@ -84,19 +84,30 @@ final class AddGameViewModel: ObservableObject {
             attended.companions = companions.trimmingCharacters(in: .whitespacesAndNewlines)
             attended.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            var photos: [GamePhoto] = []
+            // Persist the game first so the Games list updates even if photo import fails.
+            modelContext.insert(attended)
+            for stat in attended.playerStats {
+                modelContext.insert(stat)
+            }
+            try modelContext.save()
+
+            // Best-effort photos — never block the saved game.
             for item in photoItems {
-                if let data = try await item.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data),
-                   let jpeg = PhotoStore.jpegData(from: image) {
+                do {
+                    guard let data = try await item.loadTransferable(type: Data.self),
+                          let image = UIImage(data: data),
+                          let jpeg = PhotoStore.jpegData(from: image)
+                    else { continue }
                     let relative = try PhotoStore.saveJPEG(jpeg, gamePk: attended.mlbGamePk)
-                    photos.append(GamePhoto(relativePath: relative))
+                    let photo = GamePhoto(relativePath: relative)
+                    photo.game = attended
+                    modelContext.insert(photo)
+                    attended.photos.append(photo)
+                } catch {
+                    continue
                 }
             }
-            attended.photos = photos
-
-            modelContext.insert(attended)
-            try modelContext.save()
+            try? modelContext.save()
             return attended
         } catch {
             errorMessage = error.localizedDescription

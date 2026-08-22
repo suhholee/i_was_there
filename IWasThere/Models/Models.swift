@@ -24,7 +24,12 @@ final class UserProfile {
 @Model
 final class AttendedGame {
     @Attribute(.unique) var mlbGamePk: Int
+    /// Calendar day for sorting/display (MLB officialDate as local noon — no TZ day-shift).
     var gameDate: Date
+    /// Absolute first pitch; format time in the user's current timezone.
+    var firstPitchAt: Date = Date()
+    /// MLB slate day `yyyy-MM-dd` (source of truth for the game day).
+    var officialDateString: String = ""
     /// Calendar year of the game — used later for season-context filters (WAR, wRC+, etc.).
     var season: Int
     var venueName: String
@@ -37,11 +42,11 @@ final class AttendedGame {
     var homeWon: Bool
     var awayWon: Bool
     /// Theme night / giveaway (user-entered; not from Stats API).
-    var eventTitle: String
-    /// Freeform companions for now (e.g. "Sunbin, JR"); later linkable to friends.
-    var companions: String
-    var note: String
-    var createdAt: Date
+    var eventTitle: String = ""
+    /// Freeform for now; later selectable Friends when accounts exist.
+    var companions: String = ""
+    var note: String = ""
+    var createdAt: Date = Date()
 
     @Relationship(deleteRule: .cascade, inverse: \GamePlayerStat.game)
     var playerStats: [GamePlayerStat]
@@ -52,6 +57,8 @@ final class AttendedGame {
     init(
         mlbGamePk: Int,
         gameDate: Date,
+        firstPitchAt: Date? = nil,
+        officialDateString: String = "",
         season: Int,
         venueName: String = "",
         homeTeamID: Int,
@@ -71,6 +78,8 @@ final class AttendedGame {
     ) {
         self.mlbGamePk = mlbGamePk
         self.gameDate = gameDate
+        self.firstPitchAt = firstPitchAt ?? gameDate
+        self.officialDateString = officialDateString
         self.season = season
         self.venueName = venueName
         self.homeTeamID = homeTeamID
@@ -87,6 +96,29 @@ final class AttendedGame {
         self.createdAt = createdAt
         self.playerStats = playerStats
         self.photos = photos
+    }
+
+    /// Date + first-pitch time in the **device's current timezone**.
+    var localDateTimeLabel: String {
+        let dateText: String
+        if let day = MLBDateParsing.calendarDate(fromOfficial: officialDateString.isEmpty ? nil : officialDateString) {
+            dateText = day.formatted(date: .abbreviated, time: .omitted)
+        } else {
+            dateText = gameDate.formatted(date: .abbreviated, time: .omitted)
+        }
+        let timeText = firstPitchAt.formatted(date: .omitted, time: .shortened)
+        return "\(dateText) · \(timeText)"
+    }
+
+    var localDateTimeLabelLong: String {
+        let dateText: String
+        if let day = MLBDateParsing.calendarDate(fromOfficial: officialDateString.isEmpty ? nil : officialDateString) {
+            dateText = day.formatted(date: .complete, time: .omitted)
+        } else {
+            dateText = gameDate.formatted(date: .complete, time: .omitted)
+        }
+        let timeText = firstPitchAt.formatted(date: .omitted, time: .shortened)
+        return "\(dateText) · \(timeText)"
     }
 
     /// Whether the user's favorite team won this attended game (Phase 3 Home W%).
