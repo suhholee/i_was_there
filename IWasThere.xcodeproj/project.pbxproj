@@ -1,0 +1,476 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		152F612D51CAC8C0CE09D2AB /* GamesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10EFF30583873A3C431010B /* GamesView.swift */; };
+		2FABC39B5C09DAAA4DE76D1B /* BoxscoreImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCCF677ABF18A54573C7CD15 /* BoxscoreImporter.swift */; };
+		3AD189C6419AE4BF8034FE0F /* MLBTeamCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0590A7BD07DB4DDBDE0DB5CA /* MLBTeamCatalog.swift */; };
+		4FD5A4D2D1D96FEE40E12FEC /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8B2612909C4757A59715F47 /* GameDetailView.swift */; };
+		5C691E391BA86770A338A1BD /* AddGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A4CE44EE67B656482E2688 /* AddGameView.swift */; };
+		6E1597FAFDEC8B5E563A71E9 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26729CDA69D037CF6DB9DBC2 /* Models.swift */; };
+		89451C72BD3BB08EAE41DFF9 /* AppAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72FBA65092BB3F7AD83F5BDF /* AppAppearance.swift */; };
+		9804F0D28474103AEF67484D /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3CFC57E4BED3CF9BD38FEFC /* HomeView.swift */; };
+		9FE43CFDAC1598F3B0656000 /* StatFormulas.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F4E722EDABEFF86058B195 /* StatFormulas.swift */; };
+		AE439FF12EFF9C45EA6B03CA /* AddGameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8170407B2B537C8394A51DA2 /* AddGameViewModel.swift */; };
+		B5A2AC3F44E9BFE3CCFE7C03 /* MLBAssetURLs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C713D81063DE484EA097910 /* MLBAssetURLs.swift */; };
+		B6DE97278E952AEFD4BAA8F7 /* LeadersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03D6C307E6B752533AC5565C /* LeadersView.swift */; };
+		BBADAE603FBEC32883FD25AB /* IWasThereApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD01D300603CBD1C1A22328 /* IWasThereApp.swift */; };
+		CC5204DBE6CAD36A826D2DE8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0822BD8BF231E036D471B0B8 /* SettingsView.swift */; };
+		EBB56D0EAD6FEEF8A6A9806A /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7036E5DE2A301CBDF8650F /* RootTabView.swift */; };
+		F417C3D28FBEC2A6025701CE /* MLBClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4CAE22E8DE3F3D5E5D2B1C /* MLBClient.swift */; };
+		F56666A7290CF29B8BFB443D /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3241C8F529EE5D60EFFD81EA /* DesignTokens.swift */; };
+		FF757D930E64B31FFBFE401E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F3EF71EFE4727A41AD3A8 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		03D6C307E6B752533AC5565C /* LeadersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeadersView.swift; sourceTree = "<group>"; };
+		0590A7BD07DB4DDBDE0DB5CA /* MLBTeamCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLBTeamCatalog.swift; sourceTree = "<group>"; };
+		0822BD8BF231E036D471B0B8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		26729CDA69D037CF6DB9DBC2 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		3241C8F529EE5D60EFFD81EA /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		4C713D81063DE484EA097910 /* MLBAssetURLs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLBAssetURLs.swift; sourceTree = "<group>"; };
+		5A3B91113F137A84A72B748B /* IWasThere.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IWasThere.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		72FBA65092BB3F7AD83F5BDF /* AppAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAppearance.swift; sourceTree = "<group>"; };
+		7A9F3EF71EFE4727A41AD3A8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8170407B2B537C8394A51DA2 /* AddGameViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGameViewModel.swift; sourceTree = "<group>"; };
+		9A4CAE22E8DE3F3D5E5D2B1C /* MLBClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLBClient.swift; sourceTree = "<group>"; };
+		9D7036E5DE2A301CBDF8650F /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		A8F4E722EDABEFF86058B195 /* StatFormulas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatFormulas.swift; sourceTree = "<group>"; };
+		C4A4CE44EE67B656482E2688 /* AddGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGameView.swift; sourceTree = "<group>"; };
+		C8B2612909C4757A59715F47 /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
+		DCD01D300603CBD1C1A22328 /* IWasThereApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IWasThereApp.swift; sourceTree = "<group>"; };
+		E10EFF30583873A3C431010B /* GamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamesView.swift; sourceTree = "<group>"; };
+		F3CFC57E4BED3CF9BD38FEFC /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		FCCF677ABF18A54573C7CD15 /* BoxscoreImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoxscoreImporter.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0239593E12F6D837EDA4BBBB /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				F3CFC57E4BED3CF9BD38FEFC /* HomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		08DBEF2CBF854CAC729BB7D9 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				26729CDA69D037CF6DB9DBC2 /* Models.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		107F0B573C908C6243025B30 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				9D7036E5DE2A301CBDF8650F /* RootTabView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		28840CE818169212F2574E11 /* AddGame */ = {
+			isa = PBXGroup;
+			children = (
+				C4A4CE44EE67B656482E2688 /* AddGameView.swift */,
+				8170407B2B537C8394A51DA2 /* AddGameViewModel.swift */,
+			);
+			path = AddGame;
+			sourceTree = "<group>";
+		};
+		3794A53EF4E3E8BFCF93A2BC /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				E4833C857FE35074E8F861CF /* MLB */,
+				EE3BDE0A6FB1F24716B39351 /* Stats */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		438B5B9C182B753AEAA9AE35 /* IWasThere */ = {
+			isa = PBXGroup;
+			children = (
+				7A9F3EF71EFE4727A41AD3A8 /* Assets.xcassets */,
+				DCD01D300603CBD1C1A22328 /* IWasThereApp.swift */,
+				107F0B573C908C6243025B30 /* App */,
+				CF60A46195F6B1711C7C8538 /* DesignSystem */,
+				E6C37FE6A983201B9F21C9B2 /* Features */,
+				08DBEF2CBF854CAC729BB7D9 /* Models */,
+				3794A53EF4E3E8BFCF93A2BC /* Services */,
+			);
+			path = IWasThere;
+			sourceTree = "<group>";
+		};
+		5A3FA34C36EB4FFB9982D8EA /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				0822BD8BF231E036D471B0B8 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		65272B28D2E4237235C456C8 /* Games */ = {
+			isa = PBXGroup;
+			children = (
+				C8B2612909C4757A59715F47 /* GameDetailView.swift */,
+				E10EFF30583873A3C431010B /* GamesView.swift */,
+			);
+			path = Games;
+			sourceTree = "<group>";
+		};
+		85F845DDBFFD7404B9655AA6 /* Leaders */ = {
+			isa = PBXGroup;
+			children = (
+				03D6C307E6B752533AC5565C /* LeadersView.swift */,
+			);
+			path = Leaders;
+			sourceTree = "<group>";
+		};
+		8C4CC34BC168CAADD8C95054 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5A3B91113F137A84A72B748B /* IWasThere.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		9F4348A93FDAE12DD66CE64D = {
+			isa = PBXGroup;
+			children = (
+				438B5B9C182B753AEAA9AE35 /* IWasThere */,
+				8C4CC34BC168CAADD8C95054 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		CF60A46195F6B1711C7C8538 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				72FBA65092BB3F7AD83F5BDF /* AppAppearance.swift */,
+				3241C8F529EE5D60EFFD81EA /* DesignTokens.swift */,
+			);
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
+		E4833C857FE35074E8F861CF /* MLB */ = {
+			isa = PBXGroup;
+			children = (
+				FCCF677ABF18A54573C7CD15 /* BoxscoreImporter.swift */,
+				4C713D81063DE484EA097910 /* MLBAssetURLs.swift */,
+				9A4CAE22E8DE3F3D5E5D2B1C /* MLBClient.swift */,
+				0590A7BD07DB4DDBDE0DB5CA /* MLBTeamCatalog.swift */,
+			);
+			path = MLB;
+			sourceTree = "<group>";
+		};
+		E6C37FE6A983201B9F21C9B2 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				28840CE818169212F2574E11 /* AddGame */,
+				65272B28D2E4237235C456C8 /* Games */,
+				0239593E12F6D837EDA4BBBB /* Home */,
+				85F845DDBFFD7404B9655AA6 /* Leaders */,
+				5A3FA34C36EB4FFB9982D8EA /* Settings */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		EE3BDE0A6FB1F24716B39351 /* Stats */ = {
+			isa = PBXGroup;
+			children = (
+				A8F4E722EDABEFF86058B195 /* StatFormulas.swift */,
+			);
+			path = Stats;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8915A6586DA2FC35ABCEB567 /* IWasThere */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9509ED6F6BF0505957AC816A /* Build configuration list for PBXNativeTarget "IWasThere" */;
+			buildPhases = (
+				4694D0B68A669ACA95F6B139 /* Sources */,
+				C15A1D1EF62DD9BCCA678F15 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = IWasThere;
+			packageProductDependencies = (
+			);
+			productName = IWasThere;
+			productReference = 5A3B91113F137A84A72B748B /* IWasThere.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		68F77F05193C31DE62AAFB7B /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					8915A6586DA2FC35ABCEB567 = {
+						DevelopmentTeam = "";
+					};
+				};
+			};
+			buildConfigurationList = 4F359FD0877087DD11B4642B /* Build configuration list for PBXProject "IWasThere" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 9F4348A93FDAE12DD66CE64D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 8C4CC34BC168CAADD8C95054 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8915A6586DA2FC35ABCEB567 /* IWasThere */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C15A1D1EF62DD9BCCA678F15 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FF757D930E64B31FFBFE401E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4694D0B68A669ACA95F6B139 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5C691E391BA86770A338A1BD /* AddGameView.swift in Sources */,
+				AE439FF12EFF9C45EA6B03CA /* AddGameViewModel.swift in Sources */,
+				89451C72BD3BB08EAE41DFF9 /* AppAppearance.swift in Sources */,
+				2FABC39B5C09DAAA4DE76D1B /* BoxscoreImporter.swift in Sources */,
+				F56666A7290CF29B8BFB443D /* DesignTokens.swift in Sources */,
+				4FD5A4D2D1D96FEE40E12FEC /* GameDetailView.swift in Sources */,
+				152F612D51CAC8C0CE09D2AB /* GamesView.swift in Sources */,
+				9804F0D28474103AEF67484D /* HomeView.swift in Sources */,
+				BBADAE603FBEC32883FD25AB /* IWasThereApp.swift in Sources */,
+				B6DE97278E952AEFD4BAA8F7 /* LeadersView.swift in Sources */,
+				B5A2AC3F44E9BFE3CCFE7C03 /* MLBAssetURLs.swift in Sources */,
+				F417C3D28FBEC2A6025701CE /* MLBClient.swift in Sources */,
+				3AD189C6419AE4BF8034FE0F /* MLBTeamCatalog.swift in Sources */,
+				6E1597FAFDEC8B5E563A71E9 /* Models.swift in Sources */,
+				EBB56D0EAD6FEEF8A6A9806A /* RootTabView.swift in Sources */,
+				CC5204DBE6CAD36A826D2DE8 /* SettingsView.swift in Sources */,
+				9FE43CFDAC1598F3B0656000 /* StatFormulas.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		09F5B930F3EDE91CC258EC33 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				BASE_SDK = iphoneos;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		12A468A12D41660F6EFE7E9D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "#iWasThere";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Add photos from games you attended.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.suhholee.iwasthere;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		677CB81C4C0E827C3267BD43 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				BASE_SDK = iphoneos;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8080DCB54DFE23D40BB80891 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "#iWasThere";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Add photos from games you attended.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.suhholee.iwasthere;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4F359FD0877087DD11B4642B /* Build configuration list for PBXProject "IWasThere" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				677CB81C4C0E827C3267BD43 /* Debug */,
+				09F5B930F3EDE91CC258EC33 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9509ED6F6BF0505957AC816A /* Build configuration list for PBXNativeTarget "IWasThere" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8080DCB54DFE23D40BB80891 /* Debug */,
+				12A468A12D41660F6EFE7E9D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 68F77F05193C31DE62AAFB7B /* Project object */;
+}
