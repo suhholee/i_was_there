@@ -7,8 +7,10 @@ enum DesignTokens {
     static let surface = Color(red: 0.12, green: 0.15, blue: 0.20)
     /// White cards for game rows / player lines.
     static let cardBackground = Color.white
+    /// Fixed brand red for event nights / diary accents (not team-dependent).
     static let accent = Color(red: 0.85, green: 0.18, blue: 0.22)
     static let winGreen = Color(red: 0.12, green: 0.62, blue: 0.32)
+    static let loseRed = Color(red: 0.82, green: 0.16, blue: 0.20)
     /// Text on dark page background.
     static let primaryText = Color.white
     static let secondaryText = Color.white.opacity(0.65)

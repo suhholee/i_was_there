@@ -28,6 +28,12 @@
 		F417C3D28FBEC2A6025701CE /* MLBClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4CAE22E8DE3F3D5E5D2B1C /* MLBClient.swift */; };
 		F56666A7290CF29B8BFB443D /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3241C8F529EE5D60EFFD81EA /* DesignTokens.swift */; };
 		FF757D930E64B31FFBFE401E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F3EF71EFE4727A41AD3A8 /* Assets.xcassets */; };
+		EF68A05287A54985843CF11F /* TeamTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EADC2EB63F4E4426A4CAD072 /* TeamTheme.swift */; };
+		C8A4F175B979454393663CDA /* JerseyCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 792F234366604C3F8D0E57FA /* JerseyCardView.swift */; };
+		7A565B31D5F9456E9A8D7F40 /* LeaderboardEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F7FE332AB41A5B2DF8394 /* LeaderboardEngine.swift */; };
+		5EADE50F8F9C474A833B39BB /* FavoriteResultBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42435A8B24B6460FA94CA687 /* FavoriteResultBadge.swift */; };
+		28B6CB0169B74CF4B9192E61 /* PlayerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5C4D8C7161464C99C39DC7 /* PlayerDetailView.swift */; };
+		551F5979E7444CDCB9465017 /* StarterBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA686A8D49E240E1AA1A29F5 /* StarterBackfill.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -53,6 +59,12 @@
 		E10EFF30583873A3C431010B /* GamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamesView.swift; sourceTree = "<group>"; };
 		F3CFC57E4BED3CF9BD38FEFC /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		FCCF677ABF18A54573C7CD15 /* BoxscoreImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoxscoreImporter.swift; sourceTree = "<group>"; };
+		EADC2EB63F4E4426A4CAD072 /* TeamTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamTheme.swift; sourceTree = "<group>"; };
+		792F234366604C3F8D0E57FA /* JerseyCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JerseyCardView.swift; sourceTree = "<group>"; };
+		B70F7FE332AB41A5B2DF8394 /* LeaderboardEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardEngine.swift; sourceTree = "<group>"; };
+		42435A8B24B6460FA94CA687 /* FavoriteResultBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteResultBadge.swift; sourceTree = "<group>"; };
+		5B5C4D8C7161464C99C39DC7 /* PlayerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerDetailView.swift; sourceTree = "<group>"; };
+		AA686A8D49E240E1AA1A29F5 /* StarterBackfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterBackfill.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -167,6 +179,9 @@
 		CF60A46195F6B1711C7C8538 /* DesignSystem */ = {
 			isa = PBXGroup;
 			children = (
+				42435A8B24B6460FA94CA687 /* FavoriteResultBadge.swift */,
+				EADC2EB63F4E4426A4CAD072 /* TeamTheme.swift */,
+				792F234366604C3F8D0E57FA /* JerseyCardView.swift */,
 				72FBA65092BB3F7AD83F5BDF /* AppAppearance.swift */,
 				3241C8F529EE5D60EFFD81EA /* DesignTokens.swift */,
 			);
@@ -176,6 +191,7 @@
 		E4833C857FE35074E8F861CF /* MLB */ = {
 			isa = PBXGroup;
 			children = (
+				AA686A8D49E240E1AA1A29F5 /* StarterBackfill.swift */,
 				FCCF677ABF18A54573C7CD15 /* BoxscoreImporter.swift */,
 				4C713D81063DE484EA097910 /* MLBAssetURLs.swift */,
 				9A4CAE22E8DE3F3D5E5D2B1C /* MLBClient.swift */,
@@ -187,6 +203,7 @@
 		E6C37FE6A983201B9F21C9B2 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				4E2CC6BEB6BA4B348BA77CC4 /* Players */,
 				28840CE818169212F2574E11 /* AddGame */,
 				65272B28D2E4237235C456C8 /* Games */,
 				0239593E12F6D837EDA4BBBB /* Home */,
@@ -199,9 +216,18 @@
 		EE3BDE0A6FB1F24716B39351 /* Stats */ = {
 			isa = PBXGroup;
 			children = (
+				B70F7FE332AB41A5B2DF8394 /* LeaderboardEngine.swift */,
 				A8F4E722EDABEFF86058B195 /* StatFormulas.swift */,
 			);
 			path = Stats;
+			sourceTree = "<group>";
+		};
+		4E2CC6BEB6BA4B348BA77CC4 /* Players */ = {
+			isa = PBXGroup;
+			children = (
+				5B5C4D8C7161464C99C39DC7 /* PlayerDetailView.swift */,
+			);
+			path = Players;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -279,6 +305,9 @@
 				89451C72BD3BB08EAE41DFF9 /* AppAppearance.swift in Sources */,
 				2FABC39B5C09DAAA4DE76D1B /* BoxscoreImporter.swift in Sources */,
 				F56666A7290CF29B8BFB443D /* DesignTokens.swift in Sources */,
+				5EADE50F8F9C474A833B39BB /* FavoriteResultBadge.swift in Sources */,
+				C8A4F175B979454393663CDA /* JerseyCardView.swift in Sources */,
+				EF68A05287A54985843CF11F /* TeamTheme.swift in Sources */,
 				4FD5A4D2D1D96FEE40E12FEC /* GameDetailView.swift in Sources */,
 				2AB9C44B576805F167ADB9DB /* GamePhotoThumbnail.swift in Sources */,
 				152F612D51CAC8C0CE09D2AB /* GamesView.swift in Sources */,
@@ -291,9 +320,12 @@
 				3AD189C6419AE4BF8034FE0F /* MLBTeamCatalog.swift in Sources */,
 				6E1597FAFDEC8B5E563A71E9 /* Models.swift in Sources */,
 				EB4E6E15D378761204BCA121 /* PhotoStore.swift in Sources */,
+				28B6CB0169B74CF4B9192E61 /* PlayerDetailView.swift in Sources */,
 				EBB56D0EAD6FEEF8A6A9806A /* RootTabView.swift in Sources */,
 				CC5204DBE6CAD36A826D2DE8 /* SettingsView.swift in Sources */,
 				9FE43CFDAC1598F3B0656000 /* StatFormulas.swift in Sources */,
+				551F5979E7444CDCB9465017 /* StarterBackfill.swift in Sources */,
+				7A565B31D5F9456E9A8D7F40 /* LeaderboardEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

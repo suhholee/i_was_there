@@ -3,6 +3,7 @@ import SwiftData
 
 struct GamesView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.teamTheme) private var teamTheme
     @Query(sort: \AttendedGame.gameDate, order: .reverse) private var games: [AttendedGame]
     @Query private var profiles: [UserProfile]
     @State private var showingAddGame = false
@@ -47,7 +48,7 @@ struct GamesView: View {
                     } actions: {
                         Button("Add game") { showingAddGame = true }
                             .buttonStyle(.borderedProminent)
-                            .tint(DesignTokens.accent)
+                            .tint(teamTheme.accent)
                     }
                     .foregroundStyle(DesignTokens.primaryText)
                 } else {
@@ -102,6 +103,11 @@ struct GamesView: View {
                 AddGameView()
                     .environment(\.modelContext, modelContext)
             }
+            .task(id: games.map(\.mlbGamePk)) {
+                for game in games {
+                    await StarterBackfill.ensureStarters(for: game, modelContext: modelContext)
+                }
+            }
         }
     }
 
@@ -149,18 +155,13 @@ struct GamesView: View {
                     .foregroundStyle(DesignTokens.cardPrimaryText)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 8)
-                if game.favoriteTeamWon(favoriteTeamID: favoriteTeamID) == true {
-                    Text("WIN")
-                        .font(.caption.weight(.heavy))
-                        .foregroundStyle(DesignTokens.winGreen)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(DesignTokens.winGreen.opacity(0.12))
-                        .clipShape(Capsule())
-                }
+                FavoriteResultBadge(won: game.favoriteTeamWon(favoriteTeamID: favoriteTeamID))
             }
             Text("\(game.awayScore)–\(game.homeScore) · \(game.localDateTimeLabel)")
                 .font(.subheadline)
+                .foregroundStyle(DesignTokens.cardSecondaryText)
+            Text(game.startersLabel)
+                .font(.caption)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
             if !game.eventTitle.isEmpty {
                 Text(game.eventTitle)

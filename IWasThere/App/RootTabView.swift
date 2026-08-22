@@ -1,15 +1,13 @@
 import SwiftUI
 import SwiftData
 
-enum AppTab: Hashable {
-    case games
-    case home
-    case leaders
-    case settings
-}
-
 struct RootTabView: View {
+    @Query private var profiles: [UserProfile]
     @State private var selectedTab: AppTab = .home
+
+    private var teamTheme: TeamTheme {
+        TeamTheme.forTeamID(profiles.first?.favoriteTeamID)
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -29,12 +27,19 @@ struct RootTabView: View {
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                 .tag(AppTab.settings)
         }
-        .tint(DesignTokens.accent)
+        .environment(\.teamTheme, teamTheme)
+        .tint(teamTheme.accent)
         .preferredColorScheme(.dark)
-        // Ensures the window paints even if a child view fails to layout (e.g. external display).
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DesignTokens.background.ignoresSafeArea())
     }
+}
+
+enum AppTab: Hashable {
+    case games
+    case home
+    case leaders
+    case settings
 }
 
 #Preview {

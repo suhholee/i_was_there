@@ -36,7 +36,7 @@ struct SettingsView: View {
                         saveProfile()
                     }
 
-                    Text("Games where your favorite team won show a green WIN badge.")
+                    Text("Games where your favorite team played show a green WIN or red LOSE badge.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -50,10 +50,11 @@ struct SettingsView: View {
                 Section("About") {
                     LabeledContent("App", value: "#iWasThere")
                     LabeledContent("API", value: "MLB Stats API")
-                    LabeledContent("Prototype", value: "Phase 2")
+                    LabeledContent("Prototype", value: "Phase 3")
                 }
             }
             .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(DesignTokens.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)

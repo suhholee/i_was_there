@@ -65,6 +65,13 @@ enum BoxscoreImporter {
             awayWon: scheduleGame.teams.away.isWinner ?? (awayScore > homeScore)
         )
 
+        if let awayName = StarterBackfill.starterName(from: boxscore.teams.away) {
+            game.awayStarterName = awayName
+        }
+        if let homeName = StarterBackfill.starterName(from: boxscore.teams.home) {
+            game.homeStarterName = homeName
+        }
+
         var byPlayer: [Int: GamePlayerStat] = [:]
 
         for side in [boxscore.teams.away, boxscore.teams.home] {
@@ -132,6 +139,7 @@ enum BoxscoreImporter {
                     row.walksAllowed = pitching.baseOnBalls ?? 0
                     row.pitcherWins = pitching.wins ?? 0
                     row.pitcherLosses = pitching.losses ?? 0
+                    row.pitcherRole = Self.pitcherRole(from: pitching)
                 }
                 byPlayer[pitcherID] = row
             }
@@ -139,6 +147,16 @@ enum BoxscoreImporter {
 
         game.playerStats = Array(byPlayer.values)
         return game
+    }
+
+    /// SP from gamesStarted; CL from saves; otherwise RP.
+    static func pitcherRole(from pitching: MLBPitchingStats) -> String {
+        if (pitching.gamesStarted ?? 0) > 0 { return "SP" }
+        if (pitching.saves ?? 0) > 0 { return "CL" }
+        if let note = pitching.note?.uppercased(), note.contains("(S") || note.contains(" SV") {
+            return "CL"
+        }
+        return "RP"
     }
 }
 

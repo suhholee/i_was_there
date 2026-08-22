@@ -35,6 +35,34 @@ actor MLBClient {
         return try await get(components.url!)
     }
 
+    func person(id: Int) async throws -> MLBPersonDetail {
+        let url = baseURL.appendingPathComponent("people/\(id)")
+        let response: MLBPeopleResponse = try await get(url)
+        guard let person = response.people.first else {
+            throw MLBClientError.badStatus(404)
+        }
+        return person
+    }
+
+    /// Season / career lines from Stats API. Current season is season-to-date when asked for this year.
+    func playerStats(
+        personID: Int,
+        group: MLBStatGroup,
+        type: MLBStatType = .yearByYear
+    ) async throws -> [MLBSeasonSplit] {
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("people/\(personID)/stats"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "stats", value: type.rawValue),
+            URLQueryItem(name: "group", value: group.rawValue),
+            URLQueryItem(name: "sportId", value: "1")
+        ]
+        let response: MLBPlayerStatsResponse = try await get(components.url!)
+        return response.stats.first?.splits ?? []
+    }
+
     private func get<T: Decodable>(_ url: URL) async throws -> T {
         var request = URLRequest(url: url)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
@@ -167,8 +195,11 @@ struct MLBPitchingStats: Decodable {
     let baseOnBalls: Int?
     let wins: Int?
     let losses: Int?
+    let gamesStarted: Int?
+    let saves: Int?
     let era: String?
     let whip: String?
+    let note: String?
 }
 
 struct MLBStandingsResponse: Decodable {
@@ -184,4 +215,82 @@ struct MLBTeamRecord: Decodable {
     let wins: Int
     let losses: Int
     let winningPercentage: String
+}
+
+enum MLBStatGroup: String {
+    case hitting
+    case pitching
+}
+
+enum MLBStatType: String {
+    case yearByYear
+    case season
+}
+
+struct MLBPeopleResponse: Decodable {
+    let people: [MLBPersonDetail]
+}
+
+struct MLBPersonDetail: Decodable {
+    let id: Int
+    let fullName: String
+    let primaryNumber: String?
+    let currentTeam: MLBTeamRef?
+    let primaryPosition: MLBPosition?
+    let batSide: MLBCodeName?
+    let pitchHand: MLBCodeName?
+    let birthDate: String?
+    let height: String?
+    let weight: Int?
+}
+
+struct MLBCodeName: Decodable {
+    let code: String?
+    let description: String?
+}
+
+struct MLBPlayerStatsResponse: Decodable {
+    let stats: [MLBPlayerStatsBlock]
+}
+
+struct MLBPlayerStatsBlock: Decodable {
+    let splits: [MLBSeasonSplit]
+}
+
+struct MLBSeasonSplit: Decodable, Identifiable {
+    var id: String { "\(season ?? "x")-\(stat.gamesPlayed ?? 0)-\(stat.atBats ?? 0)-\(stat.inningsPitched ?? "")" }
+
+    let season: String?
+    let stat: MLBSeasonStatLine
+    let team: MLBTeamRef?
+}
+
+struct MLBSeasonStatLine: Decodable {
+    let gamesPlayed: Int?
+    let avg: String?
+    let obp: String?
+    let slg: String?
+    let ops: String?
+    let atBats: Int?
+    let hits: Int?
+    let doubles: Int?
+    let triples: Int?
+    let homeRuns: Int?
+    let rbi: Int?
+    let baseOnBalls: Int?
+    let strikeOuts: Int?
+    let hitByPitch: Int?
+    let sacFlies: Int?
+    let totalBases: Int?
+    let runs: Int?
+    let plateAppearances: Int?
+
+    let era: String?
+    let whip: String?
+    let inningsPitched: String?
+    let earnedRuns: Int?
+    let wins: Int?
+    let losses: Int?
+    let gamesStarted: Int?
+    let saves: Int?
 }

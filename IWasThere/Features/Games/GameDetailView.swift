@@ -6,6 +6,7 @@ import UIKit
 struct GameDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.teamTheme) private var teamTheme
     @Query private var profiles: [UserProfile]
     @Bindable var game: AttendedGame
 
@@ -31,6 +32,10 @@ struct GameDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
+
+                    if let mvp = LeaderboardEngine.gameMVP(in: game) {
+                        mvpCard(mvp)
+                    }
 
                     Picker("Section", selection: $detailTab) {
                         ForEach(DetailTab.allCases) { tab in
@@ -60,14 +65,18 @@ struct GameDetailView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .destructiveAction) {
-                Button("Delete", role: .destructive) {
-                    for photo in game.photos {
-                        PhotoStore.delete(relativePath: photo.relativePath)
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button("Delete game", role: .destructive) {
+                        for photo in game.photos {
+                            PhotoStore.delete(relativePath: photo.relativePath)
+                        }
+                        modelContext.delete(game)
+                        try? modelContext.save()
+                        dismiss()
                     }
-                    modelContext.delete(game)
-                    try? modelContext.save()
-                    dismiss()
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
@@ -79,6 +88,9 @@ struct GameDetailView: View {
                 pitcherSort = .ip
             }
         }
+        .task {
+            await StarterBackfill.ensureStarters(for: game, modelContext: modelContext)
+        }
     }
 
     private var headerCard: some View {
@@ -88,25 +100,23 @@ struct GameDetailView: View {
                     .font(.title2.weight(.bold))
                     .foregroundStyle(DesignTokens.cardPrimaryText)
                 Spacer(minLength: 8)
-                if game.favoriteTeamWon(favoriteTeamID: favoriteTeamID) == true {
-                    Text("WIN")
-                        .font(.subheadline.weight(.heavy))
-                        .foregroundStyle(DesignTokens.winGreen)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(DesignTokens.winGreen.opacity(0.12))
-                        .clipShape(Capsule())
-                }
+                FavoriteResultBadge(
+                    won: game.favoriteTeamWon(favoriteTeamID: favoriteTeamID),
+                    compact: false
+                )
             }
             Text("\(game.awayScore)–\(game.homeScore)")
                 .font(.largeTitle.weight(.heavy))
-                .foregroundStyle(DesignTokens.accent)
+                .foregroundStyle(teamTheme.primary)
             Text(game.localDateTimeLabelLong)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
             if !game.venueName.isEmpty {
                 Text(game.venueName)
                     .foregroundStyle(DesignTokens.cardSecondaryText)
             }
+            Text(game.startersLabel)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(DesignTokens.cardSecondaryText)
             if !game.eventTitle.isEmpty {
                 Text(game.eventTitle)
                     .font(.subheadline.weight(.semibold))
@@ -122,6 +132,37 @@ struct GameDetailView: View {
         .padding(16)
         .background(DesignTokens.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func mvpCard(_ mvp: GamePlayerStat) -> some View {
+        let value: String
+        let subtitle: String
+        if mvp.isPitcher {
+            value = mvp.era.map { String(format: "%.2f ERA", $0) }
+                ?? StatFormulas.formatIP(outs: mvp.inningsPitchedOuts) + " IP"
+            subtitle = "Game MVP · pitcher"
+        } else {
+            value = mvp.ops.map { String(format: "%.3f OPS", $0) } ?? "—"
+            subtitle = "Game MVP · batter score (OPS + HR/RBI weight)"
+        }
+        return NavigationLink {
+            PlayerDetailView(
+                playerID: mvp.playerID,
+                playerName: mvp.playerName,
+                jerseyNumber: mvp.jerseyNumber,
+                teamID: mvp.teamID,
+                prefersPitching: mvp.isPitcher
+            )
+        } label: {
+            JerseyCardView(
+                number: mvp.jerseyNumber,
+                name: mvp.playerName,
+                subtitle: subtitle,
+                valueLabel: value,
+                theme: TeamTheme.forTeamID(mvp.teamID)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var diaryTab: some View {
@@ -427,48 +468,59 @@ struct GameDetailView: View {
     }
 
     private func playerCard(_ stat: GamePlayerStat) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(stat.jerseyNumber.isEmpty ? "#" : "#\(stat.jerseyNumber)")
-                    .font(.caption.monospacedDigit().weight(.bold))
-                    .foregroundStyle(DesignTokens.accent)
-                Text(stat.playerName)
-                    .font(.headline)
-                    .foregroundStyle(DesignTokens.cardPrimaryText)
-                Spacer()
-                Text(stat.position)
-                    .font(.caption)
-                    .foregroundStyle(DesignTokens.cardSecondaryText)
-            }
+        NavigationLink {
+            PlayerDetailView(
+                playerID: stat.playerID,
+                playerName: stat.playerName,
+                jerseyNumber: stat.jerseyNumber,
+                teamID: stat.teamID,
+                prefersPitching: lineSegment == .pitchers || stat.isPitcher
+            )
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(stat.jerseyNumber.isEmpty ? "#" : "#\(stat.jerseyNumber)")
+                        .font(.caption.monospacedDigit().weight(.bold))
+                        .foregroundStyle(DesignTokens.accent)
+                    Text(stat.playerName)
+                        .font(.headline)
+                        .foregroundStyle(DesignTokens.cardPrimaryText)
+                    Spacer()
+                    Text(stat.position)
+                        .font(.caption)
+                        .foregroundStyle(DesignTokens.cardSecondaryText)
+                }
 
-            if lineSegment == .batters {
-                Text(
-                    "\(stat.hits)-\(stat.atBats) · HR \(stat.homeRuns) · RBI \(stat.rbi) · BB \(stat.walks)"
-                )
-                .font(.subheadline)
-                .foregroundStyle(DesignTokens.cardSecondaryText)
-                Text(
-                    "AVG \(StatFormulas.formatAverage(stat.battingAverage)) · OBP \(StatFormulas.formatAverage(stat.onBasePercentage)) · SLG \(StatFormulas.formatAverage(stat.slugging)) · OPS \(StatFormulas.formatAverage(stat.ops))"
-                )
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(DesignTokens.cardPrimaryText)
-            } else {
-                Text(
-                    "IP \(StatFormulas.formatIP(outs: stat.inningsPitchedOuts)) · ER \(stat.earnedRuns) · K \(stat.strikeouts) · BB \(stat.walksAllowed) · H \(stat.hitsAllowed)"
-                )
-                .font(.subheadline)
-                .foregroundStyle(DesignTokens.cardSecondaryText)
-                Text(
-                    "ERA \(StatFormulas.formatRate(stat.era, digits: 2)) · WHIP \(StatFormulas.formatRate(stat.whip, digits: 2))"
-                )
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(DesignTokens.cardPrimaryText)
+                if lineSegment == .batters {
+                    Text(
+                        "\(stat.hits)-\(stat.atBats) · HR \(stat.homeRuns) · RBI \(stat.rbi) · BB \(stat.walks)"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(DesignTokens.cardSecondaryText)
+                    Text(
+                        "AVG \(StatFormulas.formatAverage(stat.battingAverage)) · OBP \(StatFormulas.formatAverage(stat.onBasePercentage)) · SLG \(StatFormulas.formatAverage(stat.slugging)) · OPS \(StatFormulas.formatAverage(stat.ops))"
+                    )
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(DesignTokens.cardPrimaryText)
+                } else {
+                    Text(
+                        "IP \(StatFormulas.formatIP(outs: stat.inningsPitchedOuts)) · ER \(stat.earnedRuns) · K \(stat.strikeouts) · BB \(stat.walksAllowed) · H \(stat.hitsAllowed)"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(DesignTokens.cardSecondaryText)
+                    Text(
+                        "ERA \(StatFormulas.formatRate(stat.era, digits: 2)) · WHIP \(StatFormulas.formatRate(stat.whip, digits: 2))"
+                    )
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(DesignTokens.cardPrimaryText)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(DesignTokens.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(DesignTokens.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .buttonStyle(.plain)
     }
 }
 
