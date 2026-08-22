@@ -41,6 +41,9 @@ final class AttendedGame {
     var awayScore: Int
     var homeWon: Bool
     var awayWon: Bool
+    /// First pitcher listed in the boxscore (usual starter).
+    var homeStarterName: String = ""
+    var awayStarterName: String = ""
     /// Theme night / giveaway (user-entered; not from Stats API).
     var eventTitle: String = ""
     /// Freeform for now; later selectable Friends when accounts exist.
@@ -69,6 +72,8 @@ final class AttendedGame {
         awayScore: Int,
         homeWon: Bool = false,
         awayWon: Bool = false,
+        homeStarterName: String = "",
+        awayStarterName: String = "",
         eventTitle: String = "",
         companions: String = "",
         note: String = "",
@@ -90,12 +95,31 @@ final class AttendedGame {
         self.awayScore = awayScore
         self.homeWon = homeWon
         self.awayWon = awayWon
+        self.homeStarterName = homeStarterName
+        self.awayStarterName = awayStarterName
         self.eventTitle = eventTitle
         self.companions = companions
         self.note = note
         self.createdAt = createdAt
         self.playerStats = playerStats
         self.photos = photos
+    }
+
+    var startersLabel: String {
+        let away = awayStarterName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let home = homeStarterName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let awayPart = away.isEmpty ? "—" : shortPitcherName(away)
+        let homePart = home.isEmpty ? "—" : shortPitcherName(home)
+        return "\(awayPart) vs \(homePart)"
+    }
+
+    private func shortPitcherName(_ full: String) -> String {
+        let parts = full.split(separator: " ")
+        guard let last = parts.last else { return full }
+        if parts.count >= 2, let first = parts.first?.first {
+            return "\(first). \(last)"
+        }
+        return String(last)
     }
 
     /// Date + first-pitch time in the **device's current timezone**.
@@ -138,6 +162,8 @@ final class GamePlayerStat {
     var teamID: Int
     var position: String
     var isPitcher: Bool
+    /// Appearance role for pitchers: `SP`, `RP`, `CL` (from boxscore GS/SV).
+    var pitcherRole: String = ""
 
     // Batting counting stats (rates via StatFormulas)
     var atBats: Int
@@ -172,6 +198,7 @@ final class GamePlayerStat {
         teamID: Int,
         position: String,
         isPitcher: Bool,
+        pitcherRole: String = "",
         atBats: Int = 0,
         hits: Int = 0,
         homeRuns: Int = 0,
@@ -199,6 +226,7 @@ final class GamePlayerStat {
         self.teamID = teamID
         self.position = position
         self.isPitcher = isPitcher
+        self.pitcherRole = pitcherRole
         self.atBats = atBats
         self.hits = hits
         self.homeRuns = homeRuns
@@ -256,6 +284,17 @@ final class GamePlayerStat {
 
     var whip: Double? {
         StatFormulas.whip(hits: hitsAllowed, walks: walksAllowed, outs: inningsPitchedOuts)
+    }
+
+    /// Prefer stored role; fall back using starter names on the parent game.
+    func resolvedPitcherRole(in game: AttendedGame?) -> String {
+        let trimmed = pitcherRole.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if trimmed == "SP" || trimmed == "RP" || trimmed == "CL" { return trimmed }
+        guard isPitcher, let game else { return trimmed }
+        if playerName == game.homeStarterName || playerName == game.awayStarterName {
+            return "SP"
+        }
+        return "RP"
     }
 }
 
