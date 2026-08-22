@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		152F612D51CAC8C0CE09D2AB /* GamesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10EFF30583873A3C431010B /* GamesView.swift */; };
+		16601929EE44440F57A36C47 /* InstagramPhotoGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A74C9001A61EAC55FD21B20 /* InstagramPhotoGrid.swift */; };
 		2AB9C44B576805F167ADB9DB /* GamePhotoThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 386793D2C762B87A4D441076 /* GamePhotoThumbnail.swift */; };
 		2FABC39B5C09DAAA4DE76D1B /* BoxscoreImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCCF677ABF18A54573C7CD15 /* BoxscoreImporter.swift */; };
 		3AD189C6419AE4BF8034FE0F /* MLBTeamCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0590A7BD07DB4DDBDE0DB5CA /* MLBTeamCatalog.swift */; };
@@ -34,6 +35,7 @@
 		0590A7BD07DB4DDBDE0DB5CA /* MLBTeamCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLBTeamCatalog.swift; sourceTree = "<group>"; };
 		0822BD8BF231E036D471B0B8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		26729CDA69D037CF6DB9DBC2 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		2A74C9001A61EAC55FD21B20 /* InstagramPhotoGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstagramPhotoGrid.swift; sourceTree = "<group>"; };
 		3241C8F529EE5D60EFFD81EA /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		386793D2C762B87A4D441076 /* GamePhotoThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamePhotoThumbnail.swift; sourceTree = "<group>"; };
 		4C713D81063DE484EA097910 /* MLBAssetURLs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLBAssetURLs.swift; sourceTree = "<group>"; };
@@ -133,6 +135,7 @@
 				C8B2612909C4757A59715F47 /* GameDetailView.swift */,
 				386793D2C762B87A4D441076 /* GamePhotoThumbnail.swift */,
 				E10EFF30583873A3C431010B /* GamesView.swift */,
+				2A74C9001A61EAC55FD21B20 /* InstagramPhotoGrid.swift */,
 			);
 			path = Games;
 			sourceTree = "<group>";
@@ -281,6 +284,7 @@
 				152F612D51CAC8C0CE09D2AB /* GamesView.swift in Sources */,
 				9804F0D28474103AEF67484D /* HomeView.swift in Sources */,
 				BBADAE603FBEC32883FD25AB /* IWasThereApp.swift in Sources */,
+				16601929EE44440F57A36C47 /* InstagramPhotoGrid.swift in Sources */,
 				B6DE97278E952AEFD4BAA8F7 /* LeadersView.swift in Sources */,
 				B5A2AC3F44E9BFE3CCFE7C03 /* MLBAssetURLs.swift in Sources */,
 				F417C3D28FBEC2A6025701CE /* MLBClient.swift in Sources */,

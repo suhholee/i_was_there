@@ -9,6 +9,12 @@ struct GameDetailView: View {
     @Query private var profiles: [UserProfile]
     @Bindable var game: AttendedGame
 
+    @State private var detailTab: DetailTab = .diary
+    @State private var isEditingDiary = false
+    @State private var draftEventTitle = ""
+    @State private var draftCompanions = ""
+    @State private var draftNote = ""
+
     @State private var lineSegment: LineSegment = .batters
     @State private var batterSort: BatterSortKey = .ops
     @State private var pitcherSort: PitcherSortKey = .ip
@@ -25,9 +31,25 @@ struct GameDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
-                    diarySection
-                    photoSection
-                    linesSection
+
+                    Picker("Section", selection: $detailTab) {
+                        ForEach(DetailTab.allCases) { tab in
+                            Text(tab.title).tag(tab)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: detailTab) { _, tab in
+                        if tab != .diary {
+                            cancelDiaryEdit()
+                        }
+                    }
+
+                    switch detailTab {
+                    case .diary:
+                        diaryTab
+                    case .lines:
+                        linesSection
+                    }
                 }
                 .padding(16)
             }
@@ -79,7 +101,7 @@ struct GameDetailView: View {
             Text("\(game.awayScore)–\(game.homeScore)")
                 .font(.largeTitle.weight(.heavy))
                 .foregroundStyle(DesignTokens.accent)
-            Text(game.gameDate.formatted(date: .complete, time: .omitted))
+            Text(game.localDateTimeLabelLong)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
             if !game.venueName.isEmpty {
                 Text(game.venueName)
@@ -102,23 +124,58 @@ struct GameDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private var diarySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Diary")
-                .font(.headline)
-                .foregroundStyle(DesignTokens.primaryText)
+    private var diaryTab: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Diary")
+                    .font(.headline)
+                    .foregroundStyle(DesignTokens.primaryText)
+                Spacer()
+                if isEditingDiary {
+                    Button("Cancel") { cancelDiaryEdit() }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(DesignTokens.secondaryText)
+                    Button("Done") { saveDiaryEdit() }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(DesignTokens.accent)
+                } else {
+                    Button("Edit") { beginDiaryEdit() }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(DesignTokens.accent)
+                }
+            }
 
-            diaryEditor(title: "Event / giveaway", text: $game.eventTitle)
-            diaryEditor(title: "Companions", text: $game.companions)
-            diaryEditor(title: "Notes", text: $game.note)
+            if isEditingDiary {
+                diaryEditor(title: "Event/Giveaway", text: $draftEventTitle)
+                diaryEditor(title: "Friends", text: $draftCompanions)
+                diaryEditor(title: "Notes", text: $draftNote)
+                photoSection(editing: true)
+            } else {
+                diaryReadRow(title: "Event/Giveaway", value: game.eventTitle)
+                diaryReadRow(title: "Friends", value: game.companions)
+                diaryReadRow(title: "Notes", value: game.note)
+                photoSection(editing: false)
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(DesignTokens.surface)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .onChange(of: game.eventTitle) { _, _ in persistDiary() }
-        .onChange(of: game.companions) { _, _ in persistDiary() }
-        .onChange(of: game.note) { _, _ in persistDiary() }
+    }
+
+    private func diaryReadRow(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(DesignTokens.secondaryText)
+            Text(value.isEmpty ? "—" : value)
+                .font(.body)
+                .foregroundStyle(DesignTokens.primaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(DesignTokens.background.opacity(0.35))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
     }
 
     private func diaryEditor(title: String, text: Binding<String>) -> some View {
@@ -126,7 +183,7 @@ struct GameDetailView: View {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(DesignTokens.secondaryText)
-            TextField(title, text: text, axis: .vertical)
+            TextField("", text: text, axis: .vertical)
                 .padding(10)
                 .background(DesignTokens.cardBackground)
                 .foregroundStyle(DesignTokens.cardPrimaryText)
@@ -135,53 +192,69 @@ struct GameDetailView: View {
         }
     }
 
-    private var photoSection: some View {
+    private func photoSection(editing: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Photos")
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(DesignTokens.primaryText)
                 Spacer()
-                PhotosPicker(
-                    selection: $newPhotoItems,
-                    maxSelectionCount: 8,
-                    matching: .images
-                ) {
-                    Label("Add", systemImage: "plus")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .onChange(of: newPhotoItems) { _, items in
-                    Task { await importPhotos(items) }
+                if editing {
+                    PhotosPicker(
+                        selection: $newPhotoItems,
+                        maxSelectionCount: 8,
+                        matching: .images
+                    ) {
+                        Label("Add", systemImage: "plus")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .onChange(of: newPhotoItems) { _, items in
+                        Task { await importPhotos(items) }
+                    }
                 }
             }
 
             if game.photos.isEmpty {
-                Text("No photos yet.")
+                Text(editing ? "No photos yet." : "—")
                     .font(.subheadline)
                     .foregroundStyle(DesignTokens.secondaryText)
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)], spacing: 8) {
-                    ForEach(game.photos) { photo in
-                        ZStack(alignment: .topTrailing) {
-                            GamePhotoThumbnail(relativePath: photo.relativePath)
-                                .frame(height: 110)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            Button {
-                                deletePhoto(photo)
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.white, .black.opacity(0.55))
-                                    .padding(4)
-                            }
+                InstagramPhotoGrid(relativePaths: game.photos.map(\.relativePath)) { index in
+                    if editing {
+                        Button {
+                            deletePhoto(game.photos[index])
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(.white, .black.opacity(0.55))
+                                .padding(6)
                         }
+                    } else {
+                        EmptyView()
                     }
                 }
             }
         }
     }
 
-    private func persistDiary() {
+    private func beginDiaryEdit() {
+        draftEventTitle = game.eventTitle
+        draftCompanions = game.companions
+        draftNote = game.note
+        isEditingDiary = true
+    }
+
+    private func cancelDiaryEdit() {
+        isEditingDiary = false
+        newPhotoItems = []
+    }
+
+    private func saveDiaryEdit() {
+        game.eventTitle = draftEventTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        game.companions = draftCompanions.trimmingCharacters(in: .whitespacesAndNewlines)
+        game.note = draftNote.trimmingCharacters(in: .whitespacesAndNewlines)
         try? modelContext.save()
+        isEditingDiary = false
     }
 
     private func importPhotos(_ items: [PhotosPickerItem]) async {
@@ -209,10 +282,6 @@ struct GameDetailView: View {
 
     private var linesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Attendance-scoped lines")
-                .font(.headline)
-                .foregroundStyle(DesignTokens.primaryText)
-
             Picker("Lines", selection: $lineSegment) {
                 ForEach(LineSegment.allCases) { segment in
                     Text(segment.title).tag(segment)
@@ -403,6 +472,19 @@ struct GameDetailView: View {
     }
 }
 
+private enum DetailTab: String, CaseIterable, Identifiable {
+    case diary
+    case lines
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .diary: "Diary"
+        case .lines: "Lines"
+        }
+    }
+}
+
 private enum LineSegment: String, CaseIterable, Identifiable {
     case batters
     case pitchers
@@ -464,6 +546,9 @@ private enum PitcherSortKey: String, CaseIterable, Identifiable {
         awayScore: 3,
         homeWon: true,
         awayWon: false,
+        eventTitle: "Bobblehead Night",
+        companions: "Sunbin",
+        note: "Great game",
         playerStats: [
             GamePlayerStat(
                 playerID: 1,

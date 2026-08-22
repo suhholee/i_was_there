@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct HomeView: View {
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \AttendedGame.gameDate, order: .reverse) private var games: [AttendedGame]
     @Query private var profiles: [UserProfile]
     @State private var showingAddGame = false
@@ -66,6 +67,7 @@ struct HomeView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .sheet(isPresented: $showingAddGame) {
                 AddGameView()
+                    .environment(\.modelContext, modelContext)
             }
         }
     }

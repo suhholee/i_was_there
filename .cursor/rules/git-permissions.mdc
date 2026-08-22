@@ -1,0 +1,14 @@
+---
+description: Git commit/push only with explicit permission; never Cursor co-author
+alwaysApply: true
+---
+
+# Git: permission and authorship
+
+- **Never** create a git commit unless the user explicitly asks to commit in that message.
+- **Never** push (or `git push`) unless the user explicitly asks to push.
+- When committing (only after explicit ask), do **not** add any co-author trailer or Cursor attribution:
+  - No `Co-Authored-By:`
+  - No `Made-with: Cursor` or similar
+  - Use a normal commit message via HEREDOC only — author stays the user's git identity
+- If unsure whether they asked to commit/push, ask first; do not run those commands.
