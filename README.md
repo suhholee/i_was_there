@@ -9,11 +9,12 @@ Display name: **#iWasThere**. Local-first SwiftUI prototype — no cloud backend
 | Piece | Status |
 |-------|--------|
 | Tabs: Games · Home · Leaders · Settings | Done |
-| **Add Game** (date → Final matchup → save boxscore) | **Phase 1 done** |
+| **Add Game** (date → match → diary → boxscore) | **Phase 1–2 done** |
 | Games list + detail (batters/pitchers, computed rates) | **Phase 1 done** |
-| Photos & notes diary | Phase 2 |
+| Photos & notes diary | **Phase 2 done** |
 | Attendance W% / Leaders / jersey cards | Phase 3 |
 | Season dropdown + season-context WAR/wOBA/wRC+/FIP | Phase 3 (same MLB API `stats=sabermetrics`) |
+| Team color theme + alternate app icons | Phase 3–4 |
 
 ## Architecture
 
@@ -73,10 +74,10 @@ Jersey **numbers** come from the boxscore; jersey **art** and team **colors** ar
 ## Roadmap
 
 1. Phase 0 — shell + models + client  
-2. **Phase 1 — Add Game + detail lines (current)**  
-3. Phase 2 — photos + notes  
-4. Phase 3 — Home W%, Leaders, jersey cards, **season dropdown + sabermetrics context**  
-5. Phase 4 — polish  
+2. **Phase 1 — Add Game + detail lines**  
+3. **Phase 2 — photos + event/companions/notes diary (current)**  
+4. Phase 3 — Home W%, Leaders, jersey cards, season dropdown, **team color theme**  
+5. Phase 4 — polish, responsiveness, **alternate app icons**  
 
 ## License / API note
 

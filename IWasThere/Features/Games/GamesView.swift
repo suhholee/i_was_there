@@ -160,7 +160,19 @@ struct GamesView: View {
             Text("\(game.awayScore)–\(game.homeScore) · \(game.gameDate.formatted(date: .abbreviated, time: .omitted))")
                 .font(.subheadline)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
-            Text("\(game.playerStats.count) player lines")
+            if !game.eventTitle.isEmpty {
+                Text(game.eventTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DesignTokens.accent)
+                    .lineLimit(2)
+            }
+            if !game.companions.isEmpty {
+                Text("w/ \(game.companions)")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.cardSecondaryText)
+                    .lineLimit(1)
+            }
+            Text("\(game.playerStats.count) player lines · \(game.photos.count) photo\(game.photos.count == 1 ? "" : "s")")
                 .font(.caption)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
         }

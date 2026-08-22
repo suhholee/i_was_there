@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		152F612D51CAC8C0CE09D2AB /* GamesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10EFF30583873A3C431010B /* GamesView.swift */; };
+		2AB9C44B576805F167ADB9DB /* GamePhotoThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 386793D2C762B87A4D441076 /* GamePhotoThumbnail.swift */; };
 		2FABC39B5C09DAAA4DE76D1B /* BoxscoreImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCCF677ABF18A54573C7CD15 /* BoxscoreImporter.swift */; };
 		3AD189C6419AE4BF8034FE0F /* MLBTeamCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0590A7BD07DB4DDBDE0DB5CA /* MLBTeamCatalog.swift */; };
 		4FD5A4D2D1D96FEE40E12FEC /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8B2612909C4757A59715F47 /* GameDetailView.swift */; };
@@ -21,6 +22,7 @@
 		B6DE97278E952AEFD4BAA8F7 /* LeadersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03D6C307E6B752533AC5565C /* LeadersView.swift */; };
 		BBADAE603FBEC32883FD25AB /* IWasThereApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD01D300603CBD1C1A22328 /* IWasThereApp.swift */; };
 		CC5204DBE6CAD36A826D2DE8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0822BD8BF231E036D471B0B8 /* SettingsView.swift */; };
+		EB4E6E15D378761204BCA121 /* PhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6376294FFF0F2A0476069F /* PhotoStore.swift */; };
 		EBB56D0EAD6FEEF8A6A9806A /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7036E5DE2A301CBDF8650F /* RootTabView.swift */; };
 		F417C3D28FBEC2A6025701CE /* MLBClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4CAE22E8DE3F3D5E5D2B1C /* MLBClient.swift */; };
 		F56666A7290CF29B8BFB443D /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3241C8F529EE5D60EFFD81EA /* DesignTokens.swift */; };
@@ -33,6 +35,7 @@
 		0822BD8BF231E036D471B0B8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		26729CDA69D037CF6DB9DBC2 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		3241C8F529EE5D60EFFD81EA /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		386793D2C762B87A4D441076 /* GamePhotoThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamePhotoThumbnail.swift; sourceTree = "<group>"; };
 		4C713D81063DE484EA097910 /* MLBAssetURLs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLBAssetURLs.swift; sourceTree = "<group>"; };
 		5A3B91113F137A84A72B748B /* IWasThere.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IWasThere.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		72FBA65092BB3F7AD83F5BDF /* AppAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAppearance.swift; sourceTree = "<group>"; };
@@ -41,6 +44,7 @@
 		9A4CAE22E8DE3F3D5E5D2B1C /* MLBClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLBClient.swift; sourceTree = "<group>"; };
 		9D7036E5DE2A301CBDF8650F /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		A8F4E722EDABEFF86058B195 /* StatFormulas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatFormulas.swift; sourceTree = "<group>"; };
+		AA6376294FFF0F2A0476069F /* PhotoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoStore.swift; sourceTree = "<group>"; };
 		C4A4CE44EE67B656482E2688 /* AddGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGameView.swift; sourceTree = "<group>"; };
 		C8B2612909C4757A59715F47 /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
 		DCD01D300603CBD1C1A22328 /* IWasThereApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IWasThereApp.swift; sourceTree = "<group>"; };
@@ -56,6 +60,14 @@
 				F3CFC57E4BED3CF9BD38FEFC /* HomeView.swift */,
 			);
 			path = Home;
+			sourceTree = "<group>";
+		};
+		030CCAB330826142AF691630 /* Media */ = {
+			isa = PBXGroup;
+			children = (
+				AA6376294FFF0F2A0476069F /* PhotoStore.swift */,
+			);
+			path = Media;
 			sourceTree = "<group>";
 		};
 		08DBEF2CBF854CAC729BB7D9 /* Models */ = {
@@ -86,6 +98,7 @@
 		3794A53EF4E3E8BFCF93A2BC /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				030CCAB330826142AF691630 /* Media */,
 				E4833C857FE35074E8F861CF /* MLB */,
 				EE3BDE0A6FB1F24716B39351 /* Stats */,
 			);
@@ -118,6 +131,7 @@
 			isa = PBXGroup;
 			children = (
 				C8B2612909C4757A59715F47 /* GameDetailView.swift */,
+				386793D2C762B87A4D441076 /* GamePhotoThumbnail.swift */,
 				E10EFF30583873A3C431010B /* GamesView.swift */,
 			);
 			path = Games;
@@ -263,6 +277,7 @@
 				2FABC39B5C09DAAA4DE76D1B /* BoxscoreImporter.swift in Sources */,
 				F56666A7290CF29B8BFB443D /* DesignTokens.swift in Sources */,
 				4FD5A4D2D1D96FEE40E12FEC /* GameDetailView.swift in Sources */,
+				2AB9C44B576805F167ADB9DB /* GamePhotoThumbnail.swift in Sources */,
 				152F612D51CAC8C0CE09D2AB /* GamesView.swift in Sources */,
 				9804F0D28474103AEF67484D /* HomeView.swift in Sources */,
 				BBADAE603FBEC32883FD25AB /* IWasThereApp.swift in Sources */,
@@ -271,6 +286,7 @@
 				F417C3D28FBEC2A6025701CE /* MLBClient.swift in Sources */,
 				3AD189C6419AE4BF8034FE0F /* MLBTeamCatalog.swift in Sources */,
 				6E1597FAFDEC8B5E563A71E9 /* Models.swift in Sources */,
+				EB4E6E15D378761204BCA121 /* PhotoStore.swift in Sources */,
 				EBB56D0EAD6FEEF8A6A9806A /* RootTabView.swift in Sources */,
 				CC5204DBE6CAD36A826D2DE8 /* SettingsView.swift in Sources */,
 				9FE43CFDAC1598F3B0656000 /* StatFormulas.swift in Sources */,

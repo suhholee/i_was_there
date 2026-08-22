@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
+import UIKit
 
 struct GameDetailView: View {
     @Environment(\.modelContext) private var modelContext
@@ -12,6 +14,7 @@ struct GameDetailView: View {
     @State private var pitcherSort: PitcherSortKey = .ip
     /// `false` = High → Low (descending), `true` = Low → High (ascending)
     @State private var sortAscending = false
+    @State private var newPhotoItems: [PhotosPickerItem] = []
 
     private var favoriteTeamID: Int? { profiles.first?.favoriteTeamID }
 
@@ -22,6 +25,8 @@ struct GameDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
+                    diarySection
+                    photoSection
                     linesSection
                 }
                 .padding(16)
@@ -35,6 +40,9 @@ struct GameDetailView: View {
         .toolbar {
             ToolbarItem(placement: .destructiveAction) {
                 Button("Delete", role: .destructive) {
+                    for photo in game.photos {
+                        PhotoStore.delete(relativePath: photo.relativePath)
+                    }
                     modelContext.delete(game)
                     try? modelContext.save()
                     dismiss()
@@ -77,11 +85,126 @@ struct GameDetailView: View {
                 Text(game.venueName)
                     .foregroundStyle(DesignTokens.cardSecondaryText)
             }
+            if !game.eventTitle.isEmpty {
+                Text(game.eventTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DesignTokens.accent)
+            }
+            if !game.companions.isEmpty {
+                Text("w/ \(game.companions)")
+                    .font(.subheadline)
+                    .foregroundStyle(DesignTokens.cardSecondaryText)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(DesignTokens.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var diarySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Diary")
+                .font(.headline)
+                .foregroundStyle(DesignTokens.primaryText)
+
+            diaryEditor(title: "Event / giveaway", text: $game.eventTitle)
+            diaryEditor(title: "Companions", text: $game.companions)
+            diaryEditor(title: "Notes", text: $game.note)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DesignTokens.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .onChange(of: game.eventTitle) { _, _ in persistDiary() }
+        .onChange(of: game.companions) { _, _ in persistDiary() }
+        .onChange(of: game.note) { _, _ in persistDiary() }
+    }
+
+    private func diaryEditor(title: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(DesignTokens.secondaryText)
+            TextField(title, text: text, axis: .vertical)
+                .padding(10)
+                .background(DesignTokens.cardBackground)
+                .foregroundStyle(DesignTokens.cardPrimaryText)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .lineLimit(2...5)
+        }
+    }
+
+    private var photoSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Photos")
+                    .font(.headline)
+                    .foregroundStyle(DesignTokens.primaryText)
+                Spacer()
+                PhotosPicker(
+                    selection: $newPhotoItems,
+                    maxSelectionCount: 8,
+                    matching: .images
+                ) {
+                    Label("Add", systemImage: "plus")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .onChange(of: newPhotoItems) { _, items in
+                    Task { await importPhotos(items) }
+                }
+            }
+
+            if game.photos.isEmpty {
+                Text("No photos yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(DesignTokens.secondaryText)
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)], spacing: 8) {
+                    ForEach(game.photos) { photo in
+                        ZStack(alignment: .topTrailing) {
+                            GamePhotoThumbnail(relativePath: photo.relativePath)
+                                .frame(height: 110)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            Button {
+                                deletePhoto(photo)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.white, .black.opacity(0.55))
+                                    .padding(4)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func persistDiary() {
+        try? modelContext.save()
+    }
+
+    private func importPhotos(_ items: [PhotosPickerItem]) async {
+        guard !items.isEmpty else { return }
+        for item in items {
+            if let data = try? await item.loadTransferable(type: Data.self),
+               let image = UIImage(data: data),
+               let jpeg = PhotoStore.jpegData(from: image),
+               let relative = try? PhotoStore.saveJPEG(jpeg, gamePk: game.mlbGamePk) {
+                let photo = GamePhoto(relativePath: relative)
+                photo.game = game
+                game.photos.append(photo)
+            }
+        }
+        newPhotoItems = []
+        try? modelContext.save()
+    }
+
+    private func deletePhoto(_ photo: GamePhoto) {
+        PhotoStore.delete(relativePath: photo.relativePath)
+        game.photos.removeAll { $0.persistentModelID == photo.persistentModelID }
+        modelContext.delete(photo)
+        try? modelContext.save()
     }
 
     private var linesSection: some View {

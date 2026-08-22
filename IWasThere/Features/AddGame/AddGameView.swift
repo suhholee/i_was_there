@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 struct AddGameView: View {
     @Environment(\.dismiss) private var dismiss
@@ -13,7 +14,7 @@ struct AddGameView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 stepHeader
-                Divider()
+                Divider().overlay(DesignTokens.surface)
                 content
             }
             .background(DesignTokens.background.ignoresSafeArea())
@@ -36,14 +37,20 @@ struct AddGameView: View {
     }
 
     private var stepHeader: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             stepChip(number: 1, title: "Date", active: viewModel.step == .date)
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(DesignTokens.secondaryText)
+            chevron
             stepChip(number: 2, title: "Match", active: viewModel.step == .match)
+            chevron
+            stepChip(number: 3, title: "Diary", active: viewModel.step == .diary)
         }
         .padding()
+    }
+
+    private var chevron: some View {
+        Image(systemName: "chevron.right")
+            .font(.caption2)
+            .foregroundStyle(DesignTokens.secondaryText)
     }
 
     private func stepChip(number: Int, title: String, active: Bool) -> some View {
@@ -66,6 +73,8 @@ struct AddGameView: View {
             dateStep
         case .match:
             matchStep
+        case .diary:
+            diaryStep
         }
     }
 
@@ -92,8 +101,7 @@ struct AddGameView: View {
             } label: {
                 HStack {
                     if viewModel.isLoading {
-                        ProgressView()
-                            .tint(.white)
+                        ProgressView().tint(.white)
                     }
                     Text("Find MLB games")
                         .fontWeight(.semibold)
@@ -121,11 +129,13 @@ struct AddGameView: View {
                 Text(viewModel.selectedDate.formatted(date: .abbreviated, time: .omitted))
                     .foregroundStyle(DesignTokens.secondaryText)
             }
+            .padding(.horizontal)
 
             if let info = viewModel.infoMessage {
                 Text(info)
                     .font(.footnote)
                     .foregroundStyle(DesignTokens.secondaryText)
+                    .padding(.horizontal)
             }
 
             if viewModel.isLoading {
@@ -169,36 +179,135 @@ struct AddGameView: View {
             }
 
             Button {
-                Task {
-                    let existing = Set(existingGames.map(\.mlbGamePk))
-                    if let saved = await viewModel.save(modelContext: modelContext, existingGamePks: existing) {
-                        onSaved?(saved)
-                        dismiss()
-                    }
-                }
+                viewModel.goToDiary()
             } label: {
-                HStack {
-                    if viewModel.isSaving {
-                        ProgressView()
-                            .tint(.white)
-                    }
-                    Text("Save to my log")
-                        .fontWeight(.semibold)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(canSave ? DesignTokens.accent : DesignTokens.surface)
-                .foregroundStyle(canSave ? Color.white : DesignTokens.secondaryText)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                Text("Next: Diary")
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(canContinueToDiary ? DesignTokens.accent : DesignTokens.surface)
+                    .foregroundStyle(canContinueToDiary ? Color.white : DesignTokens.secondaryText)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            .disabled(!canSave || viewModel.isSaving)
+            .disabled(!canContinueToDiary)
             .padding(.horizontal)
             .padding(.bottom)
         }
         .padding(.top)
     }
 
-    private var canSave: Bool {
+    private var diaryStep: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Button {
+                        viewModel.step = .match
+                    } label: {
+                        Label("Back", systemImage: "chevron.left")
+                    }
+                    Spacer()
+                    if let game = viewModel.selectedGame {
+                        Text(game.matchupLabel)
+                            .font(.caption)
+                            .foregroundStyle(DesignTokens.secondaryText)
+                            .lineLimit(1)
+                    }
+                }
+
+                Text("What made this night?")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(DesignTokens.primaryText)
+
+                diaryField(
+                    title: "Event / giveaway",
+                    placeholder: "e.g. Shohei Ohtani Bobblehead Night",
+                    text: $viewModel.eventTitle,
+                    axis: .vertical
+                )
+                diaryField(
+                    title: "Companions",
+                    placeholder: "e.g. Sunbin, JR & Hodu",
+                    text: $viewModel.companions,
+                    axis: .vertical
+                )
+                diaryField(
+                    title: "Notes",
+                    placeholder: "Memorable moments, caught ball, Dodger Vision…",
+                    text: $viewModel.note,
+                    axis: .vertical
+                )
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Photos")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(DesignTokens.primaryText)
+                    PhotosPicker(
+                        selection: $viewModel.photoItems,
+                        maxSelectionCount: 12,
+                        matching: .images
+                    ) {
+                        Label(
+                            viewModel.photoItems.isEmpty
+                                ? "Add photos"
+                                : "\(viewModel.photoItems.count) photo\(viewModel.photoItems.count == 1 ? "" : "s") selected",
+                            systemImage: "photo.on.rectangle.angled"
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(DesignTokens.surface)
+                        .foregroundStyle(DesignTokens.primaryText)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                }
+
+                Button {
+                    Task {
+                        let existing = Set(existingGames.map(\.mlbGamePk))
+                        if let saved = await viewModel.save(modelContext: modelContext, existingGamePks: existing) {
+                            onSaved?(saved)
+                            dismiss()
+                        }
+                    }
+                } label: {
+                    HStack {
+                        if viewModel.isSaving {
+                            ProgressView().tint(.white)
+                        }
+                        Text("Complete")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(DesignTokens.accent)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .disabled(viewModel.isSaving)
+            }
+            .padding()
+        }
+    }
+
+    private func diaryField(
+        title: String,
+        placeholder: String,
+        text: Binding<String>,
+        axis: Axis
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(DesignTokens.primaryText)
+            TextField(placeholder, text: text, axis: axis)
+                .padding(12)
+                .background(DesignTokens.surface)
+                .foregroundStyle(DesignTokens.primaryText)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .lineLimit(axis == .vertical ? 3...6 : 1...1)
+        }
+    }
+
+    private var canContinueToDiary: Bool {
         guard let game = viewModel.selectedGame else { return false }
         return game.isFinal
     }
