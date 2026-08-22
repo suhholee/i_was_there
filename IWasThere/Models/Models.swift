@@ -36,6 +36,10 @@ final class AttendedGame {
     var awayScore: Int
     var homeWon: Bool
     var awayWon: Bool
+    /// Theme night / giveaway (user-entered; not from Stats API).
+    var eventTitle: String
+    /// Freeform companions for now (e.g. "Sunbin, JR"); later linkable to friends.
+    var companions: String
     var note: String
     var createdAt: Date
 
@@ -58,6 +62,8 @@ final class AttendedGame {
         awayScore: Int,
         homeWon: Bool = false,
         awayWon: Bool = false,
+        eventTitle: String = "",
+        companions: String = "",
         note: String = "",
         createdAt: Date = .now,
         playerStats: [GamePlayerStat] = [],
@@ -75,6 +81,8 @@ final class AttendedGame {
         self.awayScore = awayScore
         self.homeWon = homeWon
         self.awayWon = awayWon
+        self.eventTitle = eventTitle
+        self.companions = companions
         self.note = note
         self.createdAt = createdAt
         self.playerStats = playerStats

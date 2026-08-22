@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import PhotosUI
+import UIKit
 
 @MainActor
 final class AddGameViewModel: ObservableObject {
@@ -8,6 +10,10 @@ final class AddGameViewModel: ObservableObject {
     @Published var selectedDate: Date = Calendar.current.date(byAdding: .day, value: -1, to: .now) ?? .now
     @Published var games: [MLBScheduleGame] = []
     @Published var selectedGame: MLBScheduleGame?
+    @Published var eventTitle: String = ""
+    @Published var companions: String = ""
+    @Published var note: String = ""
+    @Published var photoItems: [PhotosPickerItem] = []
     @Published var isLoading = false
     @Published var isSaving = false
     @Published var errorMessage: String?
@@ -42,6 +48,14 @@ final class AddGameViewModel: ObservableObject {
         }
     }
 
+    func goToDiary() {
+        guard let selectedGame, selectedGame.isFinal else {
+            errorMessage = GameImportError.notFinal.localizedDescription
+            return
+        }
+        step = .diary
+    }
+
     func save(
         modelContext: ModelContext,
         existingGamePks: Set<Int>
@@ -66,6 +80,21 @@ final class AddGameViewModel: ObservableObject {
                 boxscore: boxscore,
                 existingGamePks: existingGamePks
             )
+            attended.eventTitle = eventTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            attended.companions = companions.trimmingCharacters(in: .whitespacesAndNewlines)
+            attended.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            var photos: [GamePhoto] = []
+            for item in photoItems {
+                if let data = try await item.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data),
+                   let jpeg = PhotoStore.jpegData(from: image) {
+                    let relative = try PhotoStore.saveJPEG(jpeg, gamePk: attended.mlbGamePk)
+                    photos.append(GamePhoto(relativePath: relative))
+                }
+            }
+            attended.photos = photos
+
             modelContext.insert(attended)
             try modelContext.save()
             return attended
@@ -79,6 +108,7 @@ final class AddGameViewModel: ObservableObject {
 enum AddGameStep: Int, CaseIterable {
     case date
     case match
+    case diary
 }
 
 extension MLBScheduleGame {
