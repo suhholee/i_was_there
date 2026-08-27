@@ -164,6 +164,15 @@ final class AttendedGame {
         if awayTeamID == favoriteTeamID { return awayWon }
         return nil
     }
+
+    /// Winning club’s MLB team ID; `nil` for ties / unknown.
+    var winningTeamID: Int? {
+        if homeWon && !awayWon { return homeTeamID }
+        if awayWon && !homeWon { return awayTeamID }
+        if homeScore > awayScore { return homeTeamID }
+        if awayScore > homeScore { return awayTeamID }
+        return nil
+    }
 }
 
 @Model

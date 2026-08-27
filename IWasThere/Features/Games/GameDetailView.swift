@@ -6,7 +6,6 @@ import UIKit
 struct GameDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.teamTheme) private var teamTheme
     @Query private var profiles: [UserProfile]
     @Bindable var game: AttendedGame
 
@@ -25,6 +24,13 @@ struct GameDetailView: View {
     @State private var enlargedPhotoPath: String?
 
     private var favoriteTeamID: Int? { profiles.first?.favoriteTeamID }
+
+    private var scoreColor: Color {
+        if let winnerID = game.winningTeamID {
+            return TeamTheme.forTeamID(winnerID).primary
+        }
+        return DesignTokens.cardPrimaryText
+    }
 
     var body: some View {
         ZStack {
@@ -122,7 +128,7 @@ struct GameDetailView: View {
             }
             Text("\(game.awayScore)–\(game.homeScore)")
                 .font(ScaledTypography.heroScore)
-                .foregroundStyle(teamTheme.primary)
+                .foregroundStyle(scoreColor)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
             Text(game.localDateTimeLabelLong)
