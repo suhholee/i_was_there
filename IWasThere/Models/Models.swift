@@ -44,6 +44,8 @@ final class AttendedGame {
     /// First pitcher listed in the boxscore (usual starter).
     var homeStarterName: String = ""
     var awayStarterName: String = ""
+    /// Paid attendance from boxscore `Att` line (nil if unknown).
+    var attendanceCount: Int?
     /// Theme night / giveaway (user-entered; not from Stats API).
     var eventTitle: String = ""
     /// Freeform for now; later selectable Friends when accounts exist.
@@ -74,6 +76,7 @@ final class AttendedGame {
         awayWon: Bool = false,
         homeStarterName: String = "",
         awayStarterName: String = "",
+        attendanceCount: Int? = nil,
         eventTitle: String = "",
         companions: String = "",
         note: String = "",
@@ -97,12 +100,21 @@ final class AttendedGame {
         self.awayWon = awayWon
         self.homeStarterName = homeStarterName
         self.awayStarterName = awayStarterName
+        self.attendanceCount = attendanceCount
         self.eventTitle = eventTitle
         self.companions = companions
         self.note = note
         self.createdAt = createdAt
         self.playerStats = playerStats
         self.photos = photos
+    }
+
+    var attendanceLabel: String? {
+        guard let attendanceCount, attendanceCount > 0 else { return nil }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        let formatted = formatter.string(from: NSNumber(value: attendanceCount)) ?? "\(attendanceCount)"
+        return "Attendance: \(formatted)"
     }
 
     var startersLabel: String {

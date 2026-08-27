@@ -22,6 +22,7 @@ struct GameDetailView: View {
     /// `false` = High → Low (descending), `true` = Low → High (ascending)
     @State private var sortAscending = false
     @State private var newPhotoItems: [PhotosPickerItem] = []
+    @State private var enlargedPhotoPath: String?
 
     private var favoriteTeamID: Int? { profiles.first?.favoriteTeamID }
 
@@ -33,8 +34,12 @@ struct GameDetailView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
 
-                    if let mvp = LeaderboardEngine.gameMVP(in: game) {
-                        mvpCard(mvp)
+                    let mvps = LeaderboardEngine.gameMVPs(in: game)
+                    if let batter = mvps.batter {
+                        mvpCard(batter, isPitcher: false)
+                    }
+                    if let pitcher = mvps.pitcher {
+                        mvpCard(pitcher, isPitcher: true)
                     }
 
                     Picker("Section", selection: $detailTab) {
@@ -91,6 +96,16 @@ struct GameDetailView: View {
         .task {
             await StarterBackfill.ensureStarters(for: game, modelContext: modelContext)
         }
+        .fullScreenCover(isPresented: Binding(
+            get: { enlargedPhotoPath != nil },
+            set: { if !$0 { enlargedPhotoPath = nil } }
+        )) {
+            if let path = enlargedPhotoPath {
+                PhotoLightboxView(relativePath: path) {
+                    enlargedPhotoPath = nil
+                }
+            }
+        }
     }
 
     private var headerCard: some View {
@@ -117,6 +132,11 @@ struct GameDetailView: View {
             Text(game.startersLabel)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(DesignTokens.cardSecondaryText)
+            if let attendance = game.attendanceLabel {
+                Text(attendance)
+                    .font(.subheadline)
+                    .foregroundStyle(DesignTokens.cardSecondaryText)
+            }
             if !game.eventTitle.isEmpty {
                 Text(game.eventTitle)
                     .font(.subheadline.weight(.semibold))
@@ -134,16 +154,13 @@ struct GameDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private func mvpCard(_ mvp: GamePlayerStat) -> some View {
+    private func mvpCard(_ mvp: GamePlayerStat, isPitcher: Bool) -> some View {
         let value: String
-        let subtitle: String
-        if mvp.isPitcher {
+        if isPitcher {
             value = mvp.era.map { String(format: "%.2f ERA", $0) }
                 ?? StatFormulas.formatIP(outs: mvp.inningsPitchedOuts) + " IP"
-            subtitle = "Game MVP · pitcher"
         } else {
             value = mvp.ops.map { String(format: "%.3f OPS", $0) } ?? "—"
-            subtitle = "Game MVP · batter score (OPS + HR/RBI weight)"
         }
         return NavigationLink {
             PlayerDetailView(
@@ -151,13 +168,13 @@ struct GameDetailView: View {
                 playerName: mvp.playerName,
                 jerseyNumber: mvp.jerseyNumber,
                 teamID: mvp.teamID,
-                prefersPitching: mvp.isPitcher
+                prefersPitching: isPitcher
             )
         } label: {
             JerseyCardView(
                 number: mvp.jerseyNumber,
                 name: mvp.playerName,
-                subtitle: subtitle,
+                subtitle: "Game MVP",
                 valueLabel: value,
                 theme: TeamTheme.forTeamID(mvp.teamID)
             )
@@ -260,7 +277,12 @@ struct GameDetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(DesignTokens.secondaryText)
             } else {
-                InstagramPhotoGrid(relativePaths: game.photos.map(\.relativePath)) { index in
+                InstagramPhotoGrid(
+                    relativePaths: game.photos.map(\.relativePath),
+                    onSelect: editing ? nil : { index in
+                        enlargedPhotoPath = game.photos[index].relativePath
+                    }
+                ) { index in
                     if editing {
                         Button {
                             deletePhoto(game.photos[index])

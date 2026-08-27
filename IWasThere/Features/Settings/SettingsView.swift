@@ -35,10 +35,6 @@ struct SettingsView: View {
                     .onChange(of: favoriteTeamID) { _, _ in
                         saveProfile()
                     }
-
-                    Text("Games where your favorite team played show a green WIN or red LOSE badge.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
 
                 Section("Data") {

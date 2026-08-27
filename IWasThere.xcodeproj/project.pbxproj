@@ -9,12 +9,16 @@
 /* Begin PBXBuildFile section */
 		152F612D51CAC8C0CE09D2AB /* GamesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10EFF30583873A3C431010B /* GamesView.swift */; };
 		16601929EE44440F57A36C47 /* InstagramPhotoGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A74C9001A61EAC55FD21B20 /* InstagramPhotoGrid.swift */; };
+		28B6CB0169B74CF4B9192E61 /* PlayerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5C4D8C7161464C99C39DC7 /* PlayerDetailView.swift */; };
 		2AB9C44B576805F167ADB9DB /* GamePhotoThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 386793D2C762B87A4D441076 /* GamePhotoThumbnail.swift */; };
 		2FABC39B5C09DAAA4DE76D1B /* BoxscoreImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCCF677ABF18A54573C7CD15 /* BoxscoreImporter.swift */; };
 		3AD189C6419AE4BF8034FE0F /* MLBTeamCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0590A7BD07DB4DDBDE0DB5CA /* MLBTeamCatalog.swift */; };
 		4FD5A4D2D1D96FEE40E12FEC /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8B2612909C4757A59715F47 /* GameDetailView.swift */; };
+		551F5979E7444CDCB9465017 /* StarterBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA686A8D49E240E1AA1A29F5 /* StarterBackfill.swift */; };
 		5C691E391BA86770A338A1BD /* AddGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A4CE44EE67B656482E2688 /* AddGameView.swift */; };
+		5EADE50F8F9C474A833B39BB /* FavoriteResultBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42435A8B24B6460FA94CA687 /* FavoriteResultBadge.swift */; };
 		6E1597FAFDEC8B5E563A71E9 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26729CDA69D037CF6DB9DBC2 /* Models.swift */; };
+		7A565B31D5F9456E9A8D7F40 /* LeaderboardEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F7FE332AB41A5B2DF8394 /* LeaderboardEngine.swift */; };
 		89451C72BD3BB08EAE41DFF9 /* AppAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72FBA65092BB3F7AD83F5BDF /* AppAppearance.swift */; };
 		9804F0D28474103AEF67484D /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3CFC57E4BED3CF9BD38FEFC /* HomeView.swift */; };
 		9FE43CFDAC1598F3B0656000 /* StatFormulas.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F4E722EDABEFF86058B195 /* StatFormulas.swift */; };
@@ -22,18 +26,16 @@
 		B5A2AC3F44E9BFE3CCFE7C03 /* MLBAssetURLs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C713D81063DE484EA097910 /* MLBAssetURLs.swift */; };
 		B6DE97278E952AEFD4BAA8F7 /* LeadersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03D6C307E6B752533AC5565C /* LeadersView.swift */; };
 		BBADAE603FBEC32883FD25AB /* IWasThereApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD01D300603CBD1C1A22328 /* IWasThereApp.swift */; };
+		C8A4F175B979454393663CDA /* JerseyCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 792F234366604C3F8D0E57FA /* JerseyCardView.swift */; };
 		CC5204DBE6CAD36A826D2DE8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0822BD8BF231E036D471B0B8 /* SettingsView.swift */; };
 		EB4E6E15D378761204BCA121 /* PhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6376294FFF0F2A0476069F /* PhotoStore.swift */; };
 		EBB56D0EAD6FEEF8A6A9806A /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7036E5DE2A301CBDF8650F /* RootTabView.swift */; };
+		EF68A05287A54985843CF11F /* TeamTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EADC2EB63F4E4426A4CAD072 /* TeamTheme.swift */; };
 		F417C3D28FBEC2A6025701CE /* MLBClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4CAE22E8DE3F3D5E5D2B1C /* MLBClient.swift */; };
 		F56666A7290CF29B8BFB443D /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3241C8F529EE5D60EFFD81EA /* DesignTokens.swift */; };
 		FF757D930E64B31FFBFE401E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7A9F3EF71EFE4727A41AD3A8 /* Assets.xcassets */; };
-		EF68A05287A54985843CF11F /* TeamTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EADC2EB63F4E4426A4CAD072 /* TeamTheme.swift */; };
-		C8A4F175B979454393663CDA /* JerseyCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 792F234366604C3F8D0E57FA /* JerseyCardView.swift */; };
-		7A565B31D5F9456E9A8D7F40 /* LeaderboardEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F7FE332AB41A5B2DF8394 /* LeaderboardEngine.swift */; };
-		5EADE50F8F9C474A833B39BB /* FavoriteResultBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42435A8B24B6460FA94CA687 /* FavoriteResultBadge.swift */; };
-		28B6CB0169B74CF4B9192E61 /* PlayerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5C4D8C7161464C99C39DC7 /* PlayerDetailView.swift */; };
-		551F5979E7444CDCB9465017 /* StarterBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA686A8D49E240E1AA1A29F5 /* StarterBackfill.swift */; };
+		F4688F1BDDF6463C83A313B7 /* TeamLogoImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEFD6943E9E64915B4C13070 /* TeamLogoImage.swift */; };
+		7A4E080DE97847C8A4D701AB /* PhotoLightboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30212AB16F5044ABBD158551 /* PhotoLightboxView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,27 +46,29 @@
 		2A74C9001A61EAC55FD21B20 /* InstagramPhotoGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstagramPhotoGrid.swift; sourceTree = "<group>"; };
 		3241C8F529EE5D60EFFD81EA /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		386793D2C762B87A4D441076 /* GamePhotoThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamePhotoThumbnail.swift; sourceTree = "<group>"; };
+		42435A8B24B6460FA94CA687 /* FavoriteResultBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteResultBadge.swift; sourceTree = "<group>"; };
 		4C713D81063DE484EA097910 /* MLBAssetURLs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLBAssetURLs.swift; sourceTree = "<group>"; };
-		5A3B91113F137A84A72B748B /* IWasThere.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IWasThere.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5A3B91113F137A84A72B748B /* IWasThere.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IWasThere.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B5C4D8C7161464C99C39DC7 /* PlayerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerDetailView.swift; sourceTree = "<group>"; };
 		72FBA65092BB3F7AD83F5BDF /* AppAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAppearance.swift; sourceTree = "<group>"; };
+		792F234366604C3F8D0E57FA /* JerseyCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JerseyCardView.swift; sourceTree = "<group>"; };
 		7A9F3EF71EFE4727A41AD3A8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8170407B2B537C8394A51DA2 /* AddGameViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGameViewModel.swift; sourceTree = "<group>"; };
 		9A4CAE22E8DE3F3D5E5D2B1C /* MLBClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLBClient.swift; sourceTree = "<group>"; };
 		9D7036E5DE2A301CBDF8650F /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		A8F4E722EDABEFF86058B195 /* StatFormulas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatFormulas.swift; sourceTree = "<group>"; };
 		AA6376294FFF0F2A0476069F /* PhotoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoStore.swift; sourceTree = "<group>"; };
+		AA686A8D49E240E1AA1A29F5 /* StarterBackfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterBackfill.swift; sourceTree = "<group>"; };
+		B70F7FE332AB41A5B2DF8394 /* LeaderboardEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardEngine.swift; sourceTree = "<group>"; };
 		C4A4CE44EE67B656482E2688 /* AddGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGameView.swift; sourceTree = "<group>"; };
 		C8B2612909C4757A59715F47 /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
 		DCD01D300603CBD1C1A22328 /* IWasThereApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IWasThereApp.swift; sourceTree = "<group>"; };
 		E10EFF30583873A3C431010B /* GamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamesView.swift; sourceTree = "<group>"; };
+		EADC2EB63F4E4426A4CAD072 /* TeamTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamTheme.swift; sourceTree = "<group>"; };
 		F3CFC57E4BED3CF9BD38FEFC /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		FCCF677ABF18A54573C7CD15 /* BoxscoreImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoxscoreImporter.swift; sourceTree = "<group>"; };
-		EADC2EB63F4E4426A4CAD072 /* TeamTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamTheme.swift; sourceTree = "<group>"; };
-		792F234366604C3F8D0E57FA /* JerseyCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JerseyCardView.swift; sourceTree = "<group>"; };
-		B70F7FE332AB41A5B2DF8394 /* LeaderboardEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardEngine.swift; sourceTree = "<group>"; };
-		42435A8B24B6460FA94CA687 /* FavoriteResultBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteResultBadge.swift; sourceTree = "<group>"; };
-		5B5C4D8C7161464C99C39DC7 /* PlayerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerDetailView.swift; sourceTree = "<group>"; };
-		AA686A8D49E240E1AA1A29F5 /* StarterBackfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterBackfill.swift; sourceTree = "<group>"; };
+		FEFD6943E9E64915B4C13070 /* TeamLogoImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamLogoImage.swift; sourceTree = "<group>"; };
+		30212AB16F5044ABBD158551 /* PhotoLightboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLightboxView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -133,6 +137,14 @@
 			path = IWasThere;
 			sourceTree = "<group>";
 		};
+		4E2CC6BEB6BA4B348BA77CC4 /* Players */ = {
+			isa = PBXGroup;
+			children = (
+				5B5C4D8C7161464C99C39DC7 /* PlayerDetailView.swift */,
+			);
+			path = Players;
+			sourceTree = "<group>";
+		};
 		5A3FA34C36EB4FFB9982D8EA /* Settings */ = {
 			isa = PBXGroup;
 			children = (
@@ -144,6 +156,7 @@
 		65272B28D2E4237235C456C8 /* Games */ = {
 			isa = PBXGroup;
 			children = (
+				30212AB16F5044ABBD158551 /* PhotoLightboxView.swift */,
 				C8B2612909C4757A59715F47 /* GameDetailView.swift */,
 				386793D2C762B87A4D441076 /* GamePhotoThumbnail.swift */,
 				E10EFF30583873A3C431010B /* GamesView.swift */,
@@ -179,6 +192,7 @@
 		CF60A46195F6B1711C7C8538 /* DesignSystem */ = {
 			isa = PBXGroup;
 			children = (
+				FEFD6943E9E64915B4C13070 /* TeamLogoImage.swift */,
 				42435A8B24B6460FA94CA687 /* FavoriteResultBadge.swift */,
 				EADC2EB63F4E4426A4CAD072 /* TeamTheme.swift */,
 				792F234366604C3F8D0E57FA /* JerseyCardView.swift */,
@@ -222,14 +236,6 @@
 			path = Stats;
 			sourceTree = "<group>";
 		};
-		4E2CC6BEB6BA4B348BA77CC4 /* Players */ = {
-			isa = PBXGroup;
-			children = (
-				5B5C4D8C7161464C99C39DC7 /* PlayerDetailView.swift */,
-			);
-			path = Players;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -259,11 +265,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
-				TargetAttributes = {
-					8915A6586DA2FC35ABCEB567 = {
-						DevelopmentTeam = "";
-					};
-				};
 			};
 			buildConfigurationList = 4F359FD0877087DD11B4642B /* Build configuration list for PBXProject "IWasThere" */;
 			developmentRegion = en;
@@ -305,6 +306,7 @@
 				89451C72BD3BB08EAE41DFF9 /* AppAppearance.swift in Sources */,
 				2FABC39B5C09DAAA4DE76D1B /* BoxscoreImporter.swift in Sources */,
 				F56666A7290CF29B8BFB443D /* DesignTokens.swift in Sources */,
+				F4688F1BDDF6463C83A313B7 /* TeamLogoImage.swift in Sources */,
 				5EADE50F8F9C474A833B39BB /* FavoriteResultBadge.swift in Sources */,
 				C8A4F175B979454393663CDA /* JerseyCardView.swift in Sources */,
 				EF68A05287A54985843CF11F /* TeamTheme.swift in Sources */,
@@ -314,6 +316,7 @@
 				9804F0D28474103AEF67484D /* HomeView.swift in Sources */,
 				BBADAE603FBEC32883FD25AB /* IWasThereApp.swift in Sources */,
 				16601929EE44440F57A36C47 /* InstagramPhotoGrid.swift in Sources */,
+				7A4E080DE97847C8A4D701AB /* PhotoLightboxView.swift in Sources */,
 				B6DE97278E952AEFD4BAA8F7 /* LeadersView.swift in Sources */,
 				B5A2AC3F44E9BFE3CCFE7C03 /* MLBAssetURLs.swift in Sources */,
 				F417C3D28FBEC2A6025701CE /* MLBClient.swift in Sources */,
@@ -397,6 +400,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 2LUBQ5B36G;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "#iWasThere";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Add photos from games you attended.";
@@ -485,6 +489,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 2LUBQ5B36G;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "#iWasThere";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Add photos from games you attended.";

@@ -13,6 +13,8 @@ enum LeaderboardEngine {
         var position: String = ""
         /// Dominant pitcher role across filtered appearances.
         var pitcherRole: String = ""
+        /// Times this player was Game MVP across attended games.
+        var mvpCount: Int = 0
 
         var atBats: Int = 0
         var hits: Int = 0
@@ -139,7 +141,7 @@ enum LeaderboardEngine {
     }
 
     enum BatterCategory: String, CaseIterable, Identifiable {
-        case avg, ops, hr, rbi, hits, runs
+        case avg, ops, hr, rbi, hits, runs, mvp
 
         var id: String { rawValue }
 
@@ -151,6 +153,7 @@ enum LeaderboardEngine {
             case .rbi: "RBI"
             case .hits: "H"
             case .runs: "R"
+            case .mvp: "MVP"
             }
         }
 
@@ -164,6 +167,7 @@ enum LeaderboardEngine {
             case .rbi: Double(row.rbi)
             case .hits: Double(row.hits)
             case .runs: Double(row.runs)
+            case .mvp: Double(row.mvpCount)
             }
         }
 
@@ -171,6 +175,7 @@ enum LeaderboardEngine {
             switch self {
             case .avg, .ops: row.atBats >= 1
             case .hr, .rbi, .hits, .runs: row.plateAppearances >= 1 || row.atBats >= 1
+            case .mvp: row.mvpCount >= 1
             }
         }
 
@@ -188,12 +193,14 @@ enum LeaderboardEngine {
                 return "\(row.hits)"
             case .runs:
                 return "\(row.runs)"
+            case .mvp:
+                return "\(row.mvpCount)"
             }
         }
     }
 
     enum PitcherCategory: String, CaseIterable, Identifiable {
-        case era, whip, so, ip
+        case era, whip, so, ip, mvp
 
         var id: String { rawValue }
 
@@ -203,13 +210,14 @@ enum LeaderboardEngine {
             case .whip: "WHIP"
             case .so: "K"
             case .ip: "IP"
+            case .mvp: "MVP"
             }
         }
 
         var higherIsBetter: Bool {
             switch self {
             case .era, .whip: false
-            case .so, .ip: true
+            case .so, .ip, .mvp: true
             }
         }
 
@@ -219,11 +227,15 @@ enum LeaderboardEngine {
             case .whip: row.whip
             case .so: Double(row.strikeouts)
             case .ip: Double(row.inningsPitchedOuts)
+            case .mvp: Double(row.mvpCount)
             }
         }
 
         func qualifies(_ row: PlayerAggregate) -> Bool {
-            row.inningsPitchedOuts >= 3
+            switch self {
+            case .mvp: row.mvpCount >= 1
+            default: row.inningsPitchedOuts >= 3
+            }
         }
 
         func display(_ row: PlayerAggregate) -> String {
@@ -236,6 +248,8 @@ enum LeaderboardEngine {
                 return "\(row.strikeouts)"
             case .ip:
                 return row.inningsPitchedDisplay
+            case .mvp:
+                return "\(row.mvpCount)"
             }
         }
     }
@@ -364,14 +378,15 @@ enum LeaderboardEngine {
         position: BatterPositionFilter = .all,
         limit: Int = 20
     ) -> [PlayerAggregate] {
-        let rows = aggregates(
+        var rows = aggregates(
             from: games,
             season: season,
             pitchers: false,
             teamID: teamID,
             batterPosition: position
         )
-        .filter { category.qualifies($0) }
+        applyMVPCounts(&rows, from: games, season: season, pitchers: false)
+        rows = rows.filter { category.qualifies($0) }
         return sorted(rows, by: category.value, higherIsBetter: category.higherIsBetter, limit: limit)
     }
 
@@ -383,26 +398,32 @@ enum LeaderboardEngine {
         role: PitcherRoleFilter = .all,
         limit: Int = 20
     ) -> [PlayerAggregate] {
-        let rows = aggregates(
+        var rows = aggregates(
             from: games,
             season: season,
             pitchers: true,
             teamID: teamID,
             pitcherRole: role
         )
-        .filter { category.qualifies($0) }
+        applyMVPCounts(&rows, from: games, season: season, pitchers: true)
+        rows = rows.filter { category.qualifies($0) }
         return sorted(rows, by: category.value, higherIsBetter: category.higherIsBetter, limit: limit)
     }
 
-    /// Per-game MVP: batters preferred when they had a PA; else best pitcher line.
-    /// Batter score ≈ OPS + 0.12×HR + 0.03×RBI (documented prototype rule).
-    static func gameMVP(in game: AttendedGame) -> GamePlayerStat? {
+    /// Per-game MVPs: best batter line and best pitcher line (when each qualifies).
+    /// Batter score ≈ OPS + 0.12×HR + 0.03×RBI; pitcher ≈ IP/K/ER weighting.
+    static func gameMVPs(in game: AttendedGame) -> (batter: GamePlayerStat?, pitcher: GamePlayerStat?) {
         let batters = game.playerStats.filter { !$0.isPitcher && ($0.plateAppearances > 0 || $0.atBats > 0) }
-        if let bestBatter = batters.max(by: { batterMVPScore($0) < batterMVPScore($1) }) {
-            return bestBatter
-        }
         let pitchers = game.playerStats.filter { $0.isPitcher && $0.inningsPitchedOuts > 0 }
-        return pitchers.max(by: { pitcherMVPScore($0) < pitcherMVPScore($1) })
+        let batter = batters.max(by: { batterMVPScore($0) < batterMVPScore($1) })
+        let pitcher = pitchers.max(by: { pitcherMVPScore($0) < pitcherMVPScore($1) })
+        return (batter, pitcher)
+    }
+
+    /// Legacy single-MVP helper (batter preferred, else pitcher).
+    static func gameMVP(in game: AttendedGame) -> GamePlayerStat? {
+        let pair = gameMVPs(in: game)
+        return pair.batter ?? pair.pitcher
     }
 
     static func batterMVPScore(_ stat: GamePlayerStat) -> Double {
@@ -413,6 +434,25 @@ enum LeaderboardEngine {
     static func pitcherMVPScore(_ stat: GamePlayerStat) -> Double {
         let ip = Double(stat.inningsPitchedOuts) / 3.0
         return ip * 2.0 + Double(stat.strikeouts) * 0.35 - Double(stat.earnedRuns) * 0.75
+    }
+
+    private static func applyMVPCounts(
+        _ rows: inout [PlayerAggregate],
+        from games: [AttendedGame],
+        season: Int?,
+        pitchers: Bool
+    ) {
+        let scoped = season.map { year in games.filter { $0.season == year } } ?? games
+        var counts: [Int: Int] = [:]
+        for game in scoped {
+            let pair = gameMVPs(in: game)
+            let winner = pitchers ? pair.pitcher : pair.batter
+            guard let winner else { continue }
+            counts[winner.playerID, default: 0] += 1
+        }
+        for i in rows.indices {
+            rows[i].mvpCount = counts[rows[i].playerID] ?? 0
+        }
     }
 
     private static func sorted(

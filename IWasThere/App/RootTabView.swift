@@ -15,7 +15,7 @@ struct RootTabView: View {
                 .tabItem { Label("Games", systemImage: "baseball") }
                 .tag(AppTab.games)
 
-            HomeView()
+            HomeView(selectedTab: $selectedTab)
                 .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(AppTab.home)
 

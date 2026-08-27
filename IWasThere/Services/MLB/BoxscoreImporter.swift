@@ -71,6 +71,7 @@ enum BoxscoreImporter {
         if let homeName = StarterBackfill.starterName(from: boxscore.teams.home) {
             game.homeStarterName = homeName
         }
+        game.attendanceCount = Self.attendance(from: boxscore)
 
         var byPlayer: [Int: GamePlayerStat] = [:]
 
@@ -157,6 +158,20 @@ enum BoxscoreImporter {
             return "CL"
         }
         return "RP"
+    }
+
+    /// Parses boxscore info line `Att` → `46,105.` into an Int.
+    static func attendance(from boxscore: MLBBoxscoreResponse) -> Int? {
+        guard let lines = boxscore.info else { return nil }
+        for line in lines {
+            let label = (line.label ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard label == "att" || label == "attendance" else { continue }
+            let raw = (line.value ?? "")
+                .replacingOccurrences(of: ",", with: "")
+                .trimmingCharacters(in: CharacterSet(charactersIn: ". "))
+            if let value = Int(raw), value > 0 { return value }
+        }
+        return nil
     }
 }
 

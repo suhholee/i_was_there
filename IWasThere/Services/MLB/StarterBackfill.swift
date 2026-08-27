@@ -1,13 +1,13 @@
 import Foundation
 import SwiftData
 
-/// Fills `awayStarterName` / `homeStarterName` for games saved before starters were stored.
+/// Fills starters / attendance for games saved before those fields existed.
 enum StarterBackfill {
     @MainActor
     static func ensureStarters(for game: AttendedGame, modelContext: ModelContext) async {
         let awayEmpty = game.awayStarterName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let homeEmpty = game.homeStarterName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        guard awayEmpty || homeEmpty else { return }
+        let needsAttendance = (game.attendanceCount ?? 0) <= 0
 
         // Prefer local SP lines if pitcher roles were already imported.
         if awayEmpty,
@@ -25,7 +25,7 @@ enum StarterBackfill {
 
         let stillAwayEmpty = game.awayStarterName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let stillHomeEmpty = game.homeStarterName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        guard stillAwayEmpty || stillHomeEmpty else {
+        guard stillAwayEmpty || stillHomeEmpty || needsAttendance else {
             try? modelContext.save()
             return
         }
@@ -39,6 +39,9 @@ enum StarterBackfill {
             if stillHomeEmpty,
                let name = starterName(from: boxscore.teams.home) {
                 game.homeStarterName = name
+            }
+            if needsAttendance {
+                game.attendanceCount = BoxscoreImporter.attendance(from: boxscore)
             }
 
             // Also stamp pitcher roles when missing so Leaders filters work.

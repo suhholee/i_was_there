@@ -4,6 +4,7 @@ import SwiftData
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.teamTheme) private var teamTheme
+    @Binding var selectedTab: AppTab
     @Query(sort: \AttendedGame.gameDate, order: .reverse) private var games: [AttendedGame]
     @Query private var profiles: [UserProfile]
     @State private var showingAddGame = false
@@ -98,19 +99,8 @@ struct HomeView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 14) {
-            if let teamID = favoriteTeamID,
-               let url = MLBAssetURLs.teamSpotImage(teamID: teamID) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                    default:
-                        Circle().fill(teamTheme.primary.opacity(0.4))
-                    }
-                }
-                .frame(width: 44, height: 44)
+            if let teamID = favoriteTeamID {
+                TeamLogoImage(teamID: teamID, size: 44)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -127,6 +117,21 @@ struct HomeView: View {
     }
 
     private var favoriteTeamCard: some View {
+        Group {
+            if favoriteTeamID != nil && !games.isEmpty {
+                Button {
+                    selectedTab = .games
+                } label: {
+                    favoriteTeamCardContent
+                }
+                .buttonStyle(.plain)
+            } else {
+                favoriteTeamCardContent
+            }
+        }
+    }
+
+    private var favoriteTeamCardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(favoriteTitle)
                 .font(.headline)
@@ -340,7 +345,7 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView()
+    HomeView(selectedTab: .constant(.home))
         .environment(\.teamTheme, TeamTheme.forTeamID(119))
         .modelContainer(for: [UserProfile.self, AttendedGame.self, GamePlayerStat.self, GamePhoto.self], inMemory: true)
 }

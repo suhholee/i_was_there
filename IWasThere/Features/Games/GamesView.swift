@@ -48,7 +48,9 @@ struct GamesView: View {
                     } actions: {
                         Button("Add game") { showingAddGame = true }
                             .buttonStyle(.borderedProminent)
-                            .tint(teamTheme.accent)
+                            // Fixed brand red — team accents are often white and hide the label.
+                            .tint(DesignTokens.accent)
+                            .foregroundStyle(.white)
                     }
                     .foregroundStyle(DesignTokens.primaryText)
                 } else {
@@ -163,6 +165,11 @@ struct GamesView: View {
             Text(game.startersLabel)
                 .font(.caption)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
+            if let attendance = game.attendanceLabel {
+                Text(attendance)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.cardSecondaryText)
+            }
             if !game.eventTitle.isEmpty {
                 Text(game.eventTitle)
                     .font(.caption.weight(.semibold))

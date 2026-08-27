@@ -76,7 +76,7 @@ struct LeadersView: View {
                     ContentUnavailableView(
                         "No attendance leaders yet",
                         systemImage: "tshirt",
-                        description: Text("Log Final games to build attendance-scoped AVG, OPS, ERA, and more.")
+                        description: Text("Log the games you have attended to view your leaders.")
                     )
                     .foregroundStyle(DesignTokens.primaryText)
                     .frame(maxHeight: .infinity)

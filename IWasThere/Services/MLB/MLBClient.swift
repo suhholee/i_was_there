@@ -132,6 +132,13 @@ struct MLBVenue: Decodable {
 
 struct MLBBoxscoreResponse: Decodable {
     let teams: MLBBoxscoreTeams
+    /// Boxscore footer lines (WP, weather, **Att**, venue, …).
+    let info: [MLBBoxscoreInfoLine]?
+}
+
+struct MLBBoxscoreInfoLine: Decodable {
+    let label: String?
+    let value: String?
 }
 
 struct MLBBoxscoreTeams: Decodable {
