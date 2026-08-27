@@ -39,7 +39,7 @@ struct TeamTheme: Equatable {
         112: .init(primary: 0x0E3386, secondary: 0xCC3433, accent: 0xFFFFFF), // CHC
         113: .init(primary: 0xC6011F, secondary: 0x000000, accent: 0xFFFFFF), // CIN
         114: .init(primary: 0x00385D, secondary: 0xE50022, accent: 0xFFFFFF), // CLE
-        115: .init(primary: 0x33006F, secondary: 0xC4CED4, accent: 0x000000), // COL
+        115: .init(primary: 0x33006F, secondary: 0xC4CED4, accent: 0xFFFFFF), // COL
         116: .init(primary: 0x0C2340, secondary: 0xFA4616, accent: 0xFFFFFF), // DET
         117: .init(primary: 0x002D62, secondary: 0xEB6E1F, accent: 0xFFFFFF), // HOU
         118: .init(primary: 0x004687, secondary: 0xBD9B60, accent: 0xFFFFFF), // KC

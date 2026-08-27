@@ -121,8 +121,10 @@ struct GameDetailView: View {
                 )
             }
             Text("\(game.awayScore)–\(game.homeScore)")
-                .font(.largeTitle.weight(.heavy))
+                .font(ScaledTypography.heroScore)
                 .foregroundStyle(teamTheme.primary)
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
             Text(game.localDateTimeLabelLong)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
             if !game.venueName.isEmpty {

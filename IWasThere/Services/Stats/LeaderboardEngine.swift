@@ -4,11 +4,11 @@ import Foundation
 enum LeaderboardEngine {
     struct PlayerAggregate: Identifiable, Hashable {
         let playerID: Int
-        let playerName: String
-        let jerseyNumber: String
-        let teamID: Int
+        var playerName: String
+        var jerseyNumber: String
+        var teamID: Int
         let isPitcher: Bool
-        let games: Int
+        var games: Int
         /// Most recent field position seen while aggregating.
         var position: String = ""
         /// Dominant pitcher role across filtered appearances.
@@ -307,10 +307,13 @@ enum LeaderboardEngine {
         for game in scoped {
             for stat in game.playerStats where stat.isPitcher == pitchers {
                 if let teamID, stat.teamID != teamID { continue }
+
+                let role: String
                 if pitchers {
-                    let role = stat.resolvedPitcherRole(in: game)
+                    role = stat.resolvedPitcherRole(in: game)
                     guard pitcherRole.matches(role) else { continue }
                 } else {
+                    role = ""
                     guard batterPosition.matches(stat.position) else { continue }
                 }
 
@@ -322,40 +325,35 @@ enum LeaderboardEngine {
                     isPitcher: pitchers,
                     games: 0
                 )
-                let role = pitchers ? stat.resolvedPitcherRole(in: game) : ""
                 if pitchers {
                     var counts = roleCounts[stat.playerID] ?? [:]
                     counts[role, default: 0] += 1
                     roleCounts[stat.playerID] = counts
                 }
-                row = PlayerAggregate(
-                    playerID: row.playerID,
-                    playerName: stat.playerName.isEmpty ? row.playerName : stat.playerName,
-                    jerseyNumber: stat.jerseyNumber.isEmpty ? row.jerseyNumber : stat.jerseyNumber,
-                    teamID: stat.teamID,
-                    isPitcher: pitchers,
-                    games: row.games + 1,
-                    position: stat.position.isEmpty ? row.position : stat.position,
-                    pitcherRole: role.isEmpty ? row.pitcherRole : role,
-                    atBats: row.atBats + stat.atBats,
-                    hits: row.hits + stat.hits,
-                    homeRuns: row.homeRuns + stat.homeRuns,
-                    rbi: row.rbi + stat.rbi,
-                    walks: row.walks + stat.walks,
-                    hitByPitch: row.hitByPitch + stat.hitByPitch,
-                    sacFlies: row.sacFlies + stat.sacFlies,
-                    totalBases: row.totalBases + stat.totalBases,
-                    plateAppearances: row.plateAppearances + stat.plateAppearances,
-                    doubles: row.doubles + stat.doubles,
-                    triples: row.triples + stat.triples,
-                    strikeOutsBatting: row.strikeOutsBatting + stat.strikeOutsBatting,
-                    runs: row.runs + stat.runs,
-                    inningsPitchedOuts: row.inningsPitchedOuts + stat.inningsPitchedOuts,
-                    earnedRuns: row.earnedRuns + stat.earnedRuns,
-                    strikeouts: row.strikeouts + stat.strikeouts,
-                    hitsAllowed: row.hitsAllowed + stat.hitsAllowed,
-                    walksAllowed: row.walksAllowed + stat.walksAllowed
-                )
+                if !stat.playerName.isEmpty { row.playerName = stat.playerName }
+                if !stat.jerseyNumber.isEmpty { row.jerseyNumber = stat.jerseyNumber }
+                row.teamID = stat.teamID
+                row.games += 1
+                if !stat.position.isEmpty { row.position = stat.position }
+                if !role.isEmpty { row.pitcherRole = role }
+                row.atBats += stat.atBats
+                row.hits += stat.hits
+                row.homeRuns += stat.homeRuns
+                row.rbi += stat.rbi
+                row.walks += stat.walks
+                row.hitByPitch += stat.hitByPitch
+                row.sacFlies += stat.sacFlies
+                row.totalBases += stat.totalBases
+                row.plateAppearances += stat.plateAppearances
+                row.doubles += stat.doubles
+                row.triples += stat.triples
+                row.strikeOutsBatting += stat.strikeOutsBatting
+                row.runs += stat.runs
+                row.inningsPitchedOuts += stat.inningsPitchedOuts
+                row.earnedRuns += stat.earnedRuns
+                row.strikeouts += stat.strikeouts
+                row.hitsAllowed += stat.hitsAllowed
+                row.walksAllowed += stat.walksAllowed
                 map[stat.playerID] = row
             }
         }
@@ -376,7 +374,8 @@ enum LeaderboardEngine {
         season: Int? = nil,
         teamID: Int? = nil,
         position: BatterPositionFilter = .all,
-        limit: Int = 20
+        limit: Int = 20,
+        mvpCounts: [Int: Int]? = nil
     ) -> [PlayerAggregate] {
         var rows = aggregates(
             from: games,
@@ -385,7 +384,7 @@ enum LeaderboardEngine {
             teamID: teamID,
             batterPosition: position
         )
-        applyMVPCounts(&rows, from: games, season: season, pitchers: false)
+        applyMVPCounts(&rows, from: games, season: season, pitchers: false, cached: mvpCounts)
         rows = rows.filter { category.qualifies($0) }
         return sorted(rows, by: category.value, higherIsBetter: category.higherIsBetter, limit: limit)
     }
@@ -396,7 +395,8 @@ enum LeaderboardEngine {
         season: Int? = nil,
         teamID: Int? = nil,
         role: PitcherRoleFilter = .all,
-        limit: Int = 20
+        limit: Int = 20,
+        mvpCounts: [Int: Int]? = nil
     ) -> [PlayerAggregate] {
         var rows = aggregates(
             from: games,
@@ -405,9 +405,26 @@ enum LeaderboardEngine {
             teamID: teamID,
             pitcherRole: role
         )
-        applyMVPCounts(&rows, from: games, season: season, pitchers: true)
+        applyMVPCounts(&rows, from: games, season: season, pitchers: true, cached: mvpCounts)
         rows = rows.filter { category.qualifies($0) }
         return sorted(rows, by: category.value, higherIsBetter: category.higherIsBetter, limit: limit)
+    }
+
+    /// Precompute MVP tallies once; reuse across team/position/category filter changes.
+    static func mvpCounts(
+        from games: [AttendedGame],
+        season: Int?,
+        pitchers: Bool
+    ) -> [Int: Int] {
+        let scoped = season.map { year in games.filter { $0.season == year } } ?? games
+        var counts: [Int: Int] = [:]
+        for game in scoped {
+            let pair = gameMVPs(in: game)
+            let winner = pitchers ? pair.pitcher : pair.batter
+            guard let winner else { continue }
+            counts[winner.playerID, default: 0] += 1
+        }
+        return counts
     }
 
     /// Per-game MVPs: best batter line and best pitcher line (when each qualifies).
@@ -440,16 +457,10 @@ enum LeaderboardEngine {
         _ rows: inout [PlayerAggregate],
         from games: [AttendedGame],
         season: Int?,
-        pitchers: Bool
+        pitchers: Bool,
+        cached: [Int: Int]? = nil
     ) {
-        let scoped = season.map { year in games.filter { $0.season == year } } ?? games
-        var counts: [Int: Int] = [:]
-        for game in scoped {
-            let pair = gameMVPs(in: game)
-            let winner = pitchers ? pair.pitcher : pair.batter
-            guard let winner else { continue }
-            counts[winner.playerID, default: 0] += 1
-        }
+        let counts = cached ?? mvpCounts(from: games, season: season, pitchers: pitchers)
         for i in rows.indices {
             rows[i].mvpCount = counts[rows[i].playerID] ?? 0
         }

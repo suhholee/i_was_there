@@ -64,17 +64,17 @@ struct PlayerDetailView: View {
                 header
                 seasonPicker
 
-                sectionCard(title: "Attended (\(selectedSeason))") {
+                sectionCard(title: "Attended (\(YearFormat.string(selectedSeason)))") {
                     if let attended = attendedEither {
                         attendedStats(attended)
                     } else {
-                        Text("No attended lines for this player in \(selectedSeason).")
+                        Text(verbatim: "No attended lines for this player in \(YearFormat.string(selectedSeason)).")
                             .font(.subheadline)
                             .foregroundStyle(DesignTokens.secondaryText)
                     }
                 }
 
-                sectionCard(title: "Total season (\(selectedSeason))") {
+                sectionCard(title: "Total season (\(YearFormat.string(selectedSeason)))") {
                     if isLoading {
                         ProgressView()
                             .tint(DesignTokens.accent)
@@ -144,11 +144,11 @@ struct PlayerDetailView: View {
     private var seasonPicker: some View {
         Menu {
             ForEach(seasonOptions, id: \.self) { year in
-                Button(verbatimYear(year)) { selectedSeason = year }
+                Button(YearFormat.string(year)) { selectedSeason = year }
             }
         } label: {
             HStack {
-                Text(verbatim: "Season \(selectedSeason)")
+                Text(verbatim: "Season \(YearFormat.string(selectedSeason))")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
                 Image(systemName: "chevron.up.chevron.down")
@@ -167,7 +167,7 @@ struct PlayerDetailView: View {
         let showPitching = totalPitching != nil || prefersPitching
 
         if totalHitting == nil && totalPitching == nil {
-            Text(verbatim: "No MLB season line found for \(selectedSeason) yet.")
+            Text(verbatim: "No MLB season line found for \(YearFormat.string(selectedSeason)) yet.")
                 .font(.subheadline)
                 .foregroundStyle(DesignTokens.secondaryText)
         } else {
@@ -242,7 +242,7 @@ struct PlayerDetailView: View {
 
     private func sectionCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
+            Text(verbatim: title)
                 .font(.headline)
                 .foregroundStyle(DesignTokens.primaryText)
             content()
@@ -294,8 +294,4 @@ struct PlayerDetailView: View {
         }
         isLoading = false
     }
-}
-
-private func verbatimYear(_ year: Int) -> String {
-    String(year)
 }

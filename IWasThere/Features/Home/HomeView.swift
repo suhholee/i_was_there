@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var seasonLosses: Int?
     @State private var seasonPct: String?
     @State private var seasonLoadFailed = false
+    @State private var isLoadingSeason = false
 
     private var profile: UserProfile? { profiles.first }
     private var favoriteTeamID: Int? { profile?.favoriteTeamID }
@@ -78,6 +79,14 @@ struct HomeView: View {
                             )
                         }
                         latestGameCard
+                    } else {
+                        ContentUnavailableView {
+                            Label("No games logged", systemImage: "baseball.diamond.bases")
+                        } description: {
+                            Text("Add a game to build your attendance diary and leaders.")
+                                .foregroundStyle(DesignTokens.secondaryText)
+                        }
+                        .foregroundStyle(DesignTokens.primaryText)
                     }
                 }
                 .padding()
@@ -146,22 +155,13 @@ struct HomeView: View {
                     .font(.subheadline)
                     .foregroundStyle(DesignTokens.secondaryText)
             } else {
-                HStack(alignment: .top, spacing: 16) {
-                    recordBlock(
-                        title: "Attendance",
-                        record: attendance.recordLabel,
-                        pct: attendance.winPercentageLabel,
-                        footnote: attendance.games == 0
-                            ? "No favorite-team games yet"
-                            : "When you were there"
-                    )
-                    Divider().background(DesignTokens.secondaryText.opacity(0.3))
-                    recordBlock(
-                        title: "Season",
-                        record: seasonRecordLabel,
-                        pct: seasonPctLabel,
-                        footnote: seasonFootnote
-                    )
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 16) {
+                        recordBlocks
+                    }
+                    VStack(alignment: .leading, spacing: 16) {
+                        recordBlocks
+                    }
                 }
             }
         }
@@ -264,22 +264,58 @@ struct HomeView: View {
         }
     }
 
-    private func recordBlock(title: String, record: String, pct: String, footnote: String) -> some View {
+    @ViewBuilder
+    private var recordBlocks: some View {
+        recordBlock(
+            title: "Attendance",
+            record: attendance.recordLabel,
+            pct: attendance.winPercentageLabel,
+            footnote: attendance.games == 0
+                ? "No favorite-team games yet"
+                : "When you were there"
+        )
+        Divider().background(DesignTokens.secondaryText.opacity(0.3))
+        recordBlock(
+            title: "Season",
+            record: seasonRecordLabel,
+            pct: seasonPctLabel,
+            footnote: seasonFootnote,
+            isLoading: isLoadingSeason
+        )
+    }
+
+    private func recordBlock(
+        title: String,
+        record: String,
+        pct: String,
+        footnote: String,
+        isLoading: Bool = false
+    ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(DesignTokens.secondaryText)
-            Text(record)
-                .font(.title2.weight(.heavy))
-                .foregroundStyle(DesignTokens.primaryText)
-                .monospacedDigit()
-            Text(pct)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(DesignTokens.accent)
-                .monospacedDigit()
+            if isLoading {
+                ProgressView()
+                    .tint(DesignTokens.accent)
+                    .padding(.vertical, 4)
+            } else {
+                Text(record)
+                    .font(ScaledTypography.record)
+                    .foregroundStyle(DesignTokens.primaryText)
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                Text(pct)
+                    .font(ScaledTypography.recordPct)
+                    .foregroundStyle(DesignTokens.accent)
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+            }
             Text(footnote)
                 .font(.caption2)
-                .foregroundStyle(DesignTokens.secondaryText)
+                .foregroundStyle(seasonLoadFailed && title == "Season" ? DesignTokens.loseRed : DesignTokens.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -312,8 +348,9 @@ struct HomeView: View {
     }
 
     private var seasonFootnote: String {
-        if seasonLoadFailed { return "Couldn’t load standings" }
-        if seasonWins == nil { return "Loading…" }
+        if isLoadingSeason { return "Loading standings…" }
+        if seasonLoadFailed { return "Couldn't load standings" }
+        if seasonWins == nil { return "MLB standings" }
         return "MLB standings"
     }
 
@@ -322,7 +359,11 @@ struct HomeView: View {
         seasonLosses = nil
         seasonPct = nil
         seasonLoadFailed = false
+        isLoadingSeason = false
         guard let favoriteTeamID else { return }
+
+        isLoadingSeason = true
+        defer { isLoadingSeason = false }
 
         let season = games.map(\.season).max()
             ?? Calendar.current.component(.year, from: Date())

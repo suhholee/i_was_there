@@ -88,7 +88,7 @@ struct GamesView: View {
                 }
             }
             .navigationTitle("Games")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(DesignTokens.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
@@ -162,6 +162,9 @@ struct GamesView: View {
             Text("\(game.awayScore)–\(game.homeScore) · \(game.localDateTimeLabel)")
                 .font(.subheadline)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
+                .monospacedDigit()
+                .minimumScaleFactor(0.85)
+                .lineLimit(1)
             Text(game.startersLabel)
                 .font(.caption)
                 .foregroundStyle(DesignTokens.cardSecondaryText)

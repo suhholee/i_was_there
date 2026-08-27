@@ -8,7 +8,14 @@ struct AddGameView: View {
     @Query private var existingGames: [AttendedGame]
 
     @StateObject private var viewModel = AddGameViewModel()
+    @State private var isPickingMonthYear = false
+    @State private var draftMonth = Calendar.current.component(.month, from: .now)
+    @State private var draftYear = Calendar.current.component(.year, from: .now)
     var onSaved: ((AttendedGame) -> Void)?
+
+    private var existingGamePks: Set<Int> {
+        Set(existingGames.map(\.mlbGamePk))
+    }
 
     var body: some View {
         NavigationStack {
@@ -84,26 +91,32 @@ struct AddGameView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(DesignTokens.primaryText)
 
-            DatePicker(
-                "Game date",
-                selection: $viewModel.selectedDate,
-                in: ...Date.now,
-                displayedComponents: .date
+            GameDatePicker(
+                selectedDate: $viewModel.selectedDate,
+                isPickingMonthYear: $isPickingMonthYear,
+                draftMonth: $draftMonth,
+                draftYear: $draftYear
             )
-            .datePickerStyle(.graphical)
-            .tint(DesignTokens.accent)
-            .colorScheme(.dark)
 
             Spacer()
 
             Button {
-                Task { await viewModel.loadSchedule() }
+                if isPickingMonthYear {
+                    GameDatePicker.applyMonthYear(
+                        selectedDate: &viewModel.selectedDate,
+                        draftMonth: draftMonth,
+                        draftYear: draftYear
+                    )
+                    isPickingMonthYear = false
+                } else {
+                    Task { await viewModel.loadSchedule() }
+                }
             } label: {
                 HStack {
                     if viewModel.isLoading {
                         ProgressView().tint(.white)
                     }
-                    Text("Find MLB games")
+                    Text(isPickingMonthYear ? "Select month" : "Find MLB games")
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
@@ -115,6 +128,13 @@ struct AddGameView: View {
             .disabled(viewModel.isLoading)
         }
         .padding()
+        .onAppear {
+            GameDatePicker.syncDraft(
+                from: viewModel.selectedDate,
+                draftMonth: &draftMonth,
+                draftYear: &draftYear
+            )
+        }
     }
 
     private var matchStep: some View {
@@ -138,22 +158,43 @@ struct AddGameView: View {
                     .padding(.horizontal)
             }
 
+            if let error = viewModel.errorMessage, viewModel.step == .match {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(DesignTokens.loseRed)
+                    .padding(.horizontal)
+            }
+
             if viewModel.isLoading {
                 ProgressView("Loading schedule…")
                     .tint(DesignTokens.accent)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.games.isEmpty {
+                ContentUnavailableView(
+                    "No games found",
+                    systemImage: "calendar.badge.exclamationmark",
+                    description: Text(viewModel.infoMessage ?? "Try another date.")
+                )
+                .foregroundStyle(DesignTokens.primaryText)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(viewModel.games, id: \.gamePk) { game in
+                    let alreadyLogged = existingGamePks.contains(game.gamePk)
                     Button {
+                        guard !alreadyLogged else { return }
                         viewModel.selectedGame = game
                     } label: {
                         HStack(alignment: .top, spacing: 12) {
                             Image(systemName: viewModel.selectedGame?.gamePk == game.gamePk ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(viewModel.selectedGame?.gamePk == game.gamePk ? DesignTokens.accent : DesignTokens.secondaryText)
+                                .foregroundStyle(
+                                    alreadyLogged
+                                        ? DesignTokens.secondaryText.opacity(0.35)
+                                        : (viewModel.selectedGame?.gamePk == game.gamePk ? DesignTokens.accent : DesignTokens.secondaryText)
+                                )
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(game.matchupLabel)
                                     .font(.headline)
-                                    .foregroundStyle(DesignTokens.primaryText)
+                                    .foregroundStyle(alreadyLogged ? DesignTokens.secondaryText : DesignTokens.primaryText)
                                 Text("\(game.scoreLabel) · \(game.status.detailedState)")
                                     .font(.subheadline)
                                     .foregroundStyle(DesignTokens.secondaryText)
@@ -162,8 +203,12 @@ struct AddGameView: View {
                                         .font(.caption)
                                         .foregroundStyle(DesignTokens.secondaryText)
                                 }
-                                if !game.isFinal {
-                                    Text("Not final — can’t import box score yet")
+                                if alreadyLogged {
+                                    Text("Already logged")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(DesignTokens.secondaryText)
+                                } else if !game.isFinal {
+                                    Text("Not final — can't import box score yet")
                                         .font(.caption)
                                         .foregroundStyle(.orange)
                                 }
@@ -172,7 +217,7 @@ struct AddGameView: View {
                         }
                         .padding(.vertical, 4)
                     }
-                    .disabled(!game.isFinal)
+                    .disabled(!game.isFinal || alreadyLogged)
                     .listRowBackground(DesignTokens.surface)
                 }
                 .scrollContentBackground(.hidden)
@@ -247,8 +292,10 @@ struct AddGameView: View {
 
                 Button {
                     Task {
-                        let existing = Set(existingGames.map(\.mlbGamePk))
-                        if let saved = await viewModel.save(modelContext: modelContext, existingGamePks: existing) {
+                        if let saved = await viewModel.save(
+                            modelContext: modelContext,
+                            existingGamePks: existingGamePks
+                        ) {
                             onSaved?(saved)
                             dismiss()
                         }
@@ -289,7 +336,7 @@ struct AddGameView: View {
 
     private var canContinueToDiary: Bool {
         guard let game = viewModel.selectedGame else { return false }
-        return game.isFinal
+        return game.isFinal && !existingGamePks.contains(game.gamePk)
     }
 }
 

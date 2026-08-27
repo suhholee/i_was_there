@@ -26,9 +26,11 @@ struct JerseyCardView: View {
             }
             Spacer(minLength: 8)
             Text(valueLabel)
-                .font(compact ? .title3.weight(.heavy) : .title2.weight(.heavy))
+                .font(compact ? ScaledTypography.jerseyStatCompact : ScaledTypography.jerseyStat)
                 .foregroundStyle(statColor)
                 .monospacedDigit()
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
         }
         .padding(compact ? 12 : 16)
         .background(cardBackground)
@@ -61,7 +63,7 @@ struct JerseyCardView: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(theme.primary)
             Text(displayNumber)
-                .font(.system(size: compact ? 22 : 28, weight: .black, design: .rounded))
+                .font(compact ? ScaledTypography.jerseyNumberCompact : ScaledTypography.jerseyNumber)
                 .foregroundStyle(theme.accent)
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)

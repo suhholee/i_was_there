@@ -46,7 +46,7 @@ struct SettingsView: View {
                 Section("About") {
                     LabeledContent("App", value: "#iWasThere")
                     LabeledContent("API", value: "MLB Stats API")
-                    LabeledContent("Prototype", value: "Phase 3")
+                    LabeledContent("Prototype", value: "Phase 4")
                 }
             }
             .navigationTitle("Settings")

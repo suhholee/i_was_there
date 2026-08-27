@@ -13,6 +13,9 @@ struct LeadersView: View {
     @State private var teamFilter: Int = 0
     @State private var batterPosition: LeaderboardEngine.BatterPositionFilter = .all
     @State private var pitcherRole: LeaderboardEngine.PitcherRoleFilter = .all
+    @State private var displayedRows: [LeaderboardEngine.PlayerAggregate] = []
+    @State private var cachedMVPCounts: [Int: Int] = [:]
+    @State private var mvpCacheKey: String = ""
 
     private var favoriteTeamID: Int? { profiles.first?.favoriteTeamID }
 
@@ -38,26 +41,7 @@ struct LeadersView: View {
     }
 
     private var teamIDFilter: Int? { teamFilter == 0 ? nil : teamFilter }
-
-    private var batterRows: [LeaderboardEngine.PlayerAggregate] {
-        LeaderboardEngine.batterLeaders(
-            from: games,
-            category: batterCategory,
-            season: seasonFilter == 0 ? nil : seasonFilter,
-            teamID: teamIDFilter,
-            position: batterPosition
-        )
-    }
-
-    private var pitcherRows: [LeaderboardEngine.PlayerAggregate] {
-        LeaderboardEngine.pitcherLeaders(
-            from: games,
-            category: pitcherCategory,
-            season: seasonFilter == 0 ? nil : seasonFilter,
-            teamID: teamIDFilter,
-            role: pitcherRole
-        )
-    }
+    private var seasonValue: Int? { seasonFilter == 0 ? nil : seasonFilter }
 
     var body: some View {
         NavigationStack {
@@ -80,7 +64,7 @@ struct LeadersView: View {
                     )
                     .foregroundStyle(DesignTokens.primaryText)
                     .frame(maxHeight: .infinity)
-                } else if currentRows.isEmpty {
+                } else if displayedRows.isEmpty {
                     ContentUnavailableView(
                         "No players match",
                         systemImage: "line.3.horizontal.decrease.circle",
@@ -91,7 +75,7 @@ struct LeadersView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 10) {
-                            ForEach(Array(currentRows.enumerated()), id: \.element.id) { index, row in
+                            ForEach(Array(displayedRows.enumerated()), id: \.element.id) { index, row in
                                 NavigationLink {
                                     PlayerDetailView(
                                         playerID: row.playerID,
@@ -115,14 +99,25 @@ struct LeadersView: View {
                         .padding(.horizontal)
                         .padding(.bottom, 24)
                     }
+                    .transaction { $0.animation = nil }
                 }
             }
             .padding(.top)
             .background(DesignTokens.background.ignoresSafeArea())
             .navigationTitle("Leaders")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(DesignTokens.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .onAppear { refreshRows() }
+            .onChange(of: segment) { _, _ in refreshRows() }
+            .onChange(of: batterCategory) { _, _ in refreshRows() }
+            .onChange(of: pitcherCategory) { _, _ in refreshRows() }
+            .onChange(of: seasonFilter) { _, _ in refreshRows(invalidateMVP: true) }
+            .onChange(of: teamFilter) { _, _ in refreshRows() }
+            .onChange(of: batterPosition) { _, _ in refreshRows() }
+            .onChange(of: pitcherRole) { _, _ in refreshRows() }
+            .onChange(of: games.map(\.mlbGamePk)) { _, _ in refreshRows(invalidateMVP: true) }
         }
     }
 
@@ -174,12 +169,12 @@ struct LeadersView: View {
 
                 Menu {
                     Button("All seasons") { seasonFilter = 0 }
-                ForEach(seasonsInLog, id: \.self) { year in
-                    Button(verbatimYear(year)) { seasonFilter = year }
+                    ForEach(seasonsInLog, id: \.self) { year in
+                        Button(YearFormat.string(year)) { seasonFilter = year }
+                    }
+                } label: {
+                    filterChip(title: seasonFilter == 0 ? "All seasons" : YearFormat.string(seasonFilter))
                 }
-            } label: {
-                filterChip(title: seasonFilter == 0 ? "All seasons" : verbatimYear(seasonFilter))
-            }
             }
             .padding(.horizontal)
         }
@@ -195,7 +190,7 @@ struct LeadersView: View {
 
     private func filterChip(title: String) -> some View {
         HStack(spacing: 6) {
-            Text(title)
+            Text(verbatim: title)
                 .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
             Image(systemName: "chevron.up.chevron.down")
@@ -206,10 +201,6 @@ struct LeadersView: View {
         .padding(.vertical, 8)
         .background(DesignTokens.surface)
         .clipShape(Capsule())
-    }
-
-    private var currentRows: [LeaderboardEngine.PlayerAggregate] {
-        segment == .batters ? batterRows : pitcherRows
     }
 
     private var currentCategoryTitle: String {
@@ -224,10 +215,47 @@ struct LeadersView: View {
             return pitcherCategory.display(row)
         }
     }
-}
 
-private func verbatimYear(_ year: Int) -> String {
-    String(year)
+    private func refreshRows(invalidateMVP: Bool = false) {
+        let pitchers = segment == .pitchers
+        let key = "\(seasonFilter)-\(pitchers)-\(games.map(\.mlbGamePk))"
+        if invalidateMVP || key != mvpCacheKey {
+            cachedMVPCounts = LeaderboardEngine.mvpCounts(
+                from: games,
+                season: seasonValue,
+                pitchers: pitchers
+            )
+            mvpCacheKey = key
+        }
+
+        let next: [LeaderboardEngine.PlayerAggregate]
+        switch segment {
+        case .batters:
+            next = LeaderboardEngine.batterLeaders(
+                from: games,
+                category: batterCategory,
+                season: seasonValue,
+                teamID: teamIDFilter,
+                position: batterPosition,
+                mvpCounts: cachedMVPCounts
+            )
+        case .pitchers:
+            next = LeaderboardEngine.pitcherLeaders(
+                from: games,
+                category: pitcherCategory,
+                season: seasonValue,
+                teamID: teamIDFilter,
+                role: pitcherRole,
+                mvpCounts: cachedMVPCounts
+            )
+        }
+
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            displayedRows = next
+        }
+    }
 }
 
 private enum LeaderSegment: String, CaseIterable, Identifiable {
