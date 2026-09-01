@@ -1,6 +1,6 @@
 # #iWasThere
 
-MLB attendance diary (직관 로그) for iOS.
+Sports match attendance diary (직관 로그) for iOS.
 
 ## Requirements
 

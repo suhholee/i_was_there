@@ -4,26 +4,75 @@ import SwiftData
 @Model
 final class UserProfile {
     var displayName: String
+    /// Favorite for MLB diary (Stats API team id).
     var favoriteTeamID: Int?
     var favoriteTeamAbbr: String?
+    /// Favorite for KBO diary (synthetic `KBOTeamCatalog` id).
+    var favoriteKBOTeamID: Int?
+    var favoriteKBOTeamAbbr: String?
+    /// `League.rawValue` — which diary Home/Games/Leaders show.
+    var activeLeague: String
     var favoritePlayerIDs: [Int]
+    /// Min total PA to qualify for Home → Your leaders (batters).
+    var homeMinPlateAppearances: Int
+    /// Min total batters faced to qualify for Home → Your leaders (pitchers).
+    var homeMinBattersFaced: Int
 
     init(
         displayName: String = "",
         favoriteTeamID: Int? = nil,
         favoriteTeamAbbr: String? = nil,
-        favoritePlayerIDs: [Int] = []
+        favoriteKBOTeamID: Int? = nil,
+        favoriteKBOTeamAbbr: String? = nil,
+        activeLeague: String = League.mlb.rawValue,
+        favoritePlayerIDs: [Int] = [],
+        homeMinPlateAppearances: Int = 0,
+        homeMinBattersFaced: Int = 0
     ) {
         self.displayName = displayName
         self.favoriteTeamID = favoriteTeamID
         self.favoriteTeamAbbr = favoriteTeamAbbr
+        self.favoriteKBOTeamID = favoriteKBOTeamID
+        self.favoriteKBOTeamAbbr = favoriteKBOTeamAbbr
+        self.activeLeague = activeLeague
         self.favoritePlayerIDs = favoritePlayerIDs
+        self.homeMinPlateAppearances = homeMinPlateAppearances
+        self.homeMinBattersFaced = homeMinBattersFaced
+    }
+
+    var league: League {
+        get { League(rawValue: activeLeague) ?? .mlb }
+        set { activeLeague = newValue.rawValue }
+    }
+
+    func favoriteTeamID(for league: League) -> Int? {
+        switch league {
+        case .mlb: favoriteTeamID
+        case .kbo: favoriteKBOTeamID
+        }
+    }
+
+    func setFavoriteTeam(id: Int?, abbr: String?, for league: League) {
+        switch league {
+        case .mlb:
+            favoriteTeamID = id
+            favoriteTeamAbbr = abbr
+        case .kbo:
+            favoriteKBOTeamID = id
+            favoriteKBOTeamAbbr = abbr
+        }
     }
 }
 
 @Model
 final class AttendedGame {
     @Attribute(.unique) var mlbGamePk: Int
+    /// `mlb` or `kbo` — partitions diaries when switching leagues.
+    var league: String = League.mlb.rawValue
+    /// Stable cross-league key: `mlb:{pk}` or `kbo:{g_id}`.
+    var gameKey: String = ""
+    /// Sports2i game id when `league == kbo` (e.g. `20250422NCLG0`).
+    var kboGameID: String = ""
     /// Calendar day for sorting/display (MLB officialDate as local noon — no TZ day-shift).
     var gameDate: Date
     /// Absolute first pitch; format time in the user's current timezone.
@@ -32,6 +81,10 @@ final class AttendedGame {
     var officialDateString: String = ""
     /// Calendar year of the game — used later for season-context filters (WAR, wRC+, etc.).
     var season: Int
+    /// MLB `gameType` (`R`, `W`, …) or KBO `sr_id` (`0` = regular season).
+    var gameTypeCode: String = ""
+    /// KBO Sports2i stadium code (`s_id`); MLB uses `venueName` only.
+    var stadiumCode: String = ""
     var venueName: String
     var homeTeamID: Int
     var awayTeamID: Int
@@ -59,12 +112,20 @@ final class AttendedGame {
     @Relationship(deleteRule: .cascade, inverse: \GamePhoto.game)
     var photos: [GamePhoto]
 
+    @Relationship(deleteRule: .cascade, inverse: \GameFriend.game)
+    var friends: [GameFriend]
+
     init(
         mlbGamePk: Int,
+        league: League = .mlb,
+        gameKey: String = "",
+        kboGameID: String = "",
         gameDate: Date,
         firstPitchAt: Date? = nil,
         officialDateString: String = "",
         season: Int,
+        gameTypeCode: String = "",
+        stadiumCode: String = "",
         venueName: String = "",
         homeTeamID: Int,
         awayTeamID: Int,
@@ -82,13 +143,19 @@ final class AttendedGame {
         note: String = "",
         createdAt: Date = .now,
         playerStats: [GamePlayerStat] = [],
-        photos: [GamePhoto] = []
+        photos: [GamePhoto] = [],
+        friends: [GameFriend] = []
     ) {
         self.mlbGamePk = mlbGamePk
+        self.league = league.rawValue
+        self.gameKey = gameKey.isEmpty ? LeagueKey.mlb(mlbGamePk) : gameKey
+        self.kboGameID = kboGameID
         self.gameDate = gameDate
         self.firstPitchAt = firstPitchAt ?? gameDate
         self.officialDateString = officialDateString
         self.season = season
+        self.gameTypeCode = gameTypeCode
+        self.stadiumCode = stadiumCode
         self.venueName = venueName
         self.homeTeamID = homeTeamID
         self.awayTeamID = awayTeamID
@@ -107,8 +174,25 @@ final class AttendedGame {
         self.createdAt = createdAt
         self.playerStats = playerStats
         self.photos = photos
+        self.friends = friends
     }
 
+    var resolvedLeague: League {
+        League(rawValue: league) ?? .mlb
+    }
+
+    func ensureGameKey() {
+        if gameKey.isEmpty {
+            if resolvedLeague == .kbo, !kboGameID.isEmpty {
+                gameKey = LeagueKey.kbo(kboGameID)
+            } else {
+                gameKey = LeagueKey.mlb(mlbGamePk)
+            }
+        }
+        if league.isEmpty {
+            league = League.mlb.rawValue
+        }
+    }
     var attendanceLabel: String? {
         guard let attendanceCount, attendanceCount > 0 else { return nil }
         let formatter = NumberFormatter()
@@ -173,6 +257,23 @@ final class AttendedGame {
         if awayScore > homeScore { return awayTeamID }
         return nil
     }
+
+    /// Friend names on this game (structured rows, with legacy `companions` fallback).
+    var friendNames: [String] {
+        let structured = friends
+            .map { $0.name.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if !structured.isEmpty { return structured }
+        return GameLogFilter.companionTokens(in: companions)
+    }
+
+    var friendsLabel: String {
+        friendNames.joined(separator: ", ")
+    }
+
+    func syncCompanionsFromFriends() {
+        companions = friendsLabel
+    }
 }
 
 @Model
@@ -207,6 +308,7 @@ final class GamePlayerStat {
     var strikeouts: Int
     var hitsAllowed: Int
     var walksAllowed: Int
+    var battersFaced: Int
     var pitcherWins: Int
     var pitcherLosses: Int
 
@@ -238,6 +340,7 @@ final class GamePlayerStat {
         strikeouts: Int = 0,
         hitsAllowed: Int = 0,
         walksAllowed: Int = 0,
+        battersFaced: Int = 0,
         pitcherWins: Int = 0,
         pitcherLosses: Int = 0
     ) {
@@ -266,6 +369,7 @@ final class GamePlayerStat {
         self.strikeouts = strikeouts
         self.hitsAllowed = hitsAllowed
         self.walksAllowed = walksAllowed
+        self.battersFaced = battersFaced
         self.pitcherWins = pitcherWins
         self.pitcherLosses = pitcherLosses
     }
@@ -316,6 +420,19 @@ final class GamePlayerStat {
             return "SP"
         }
         return "RP"
+    }
+}
+
+@Model
+final class GameFriend {
+    var name: String
+    /// Reserved for a linked #iWasThere account when social sync ships.
+    var linkedUserID: Int?
+    var game: AttendedGame?
+
+    init(name: String, linkedUserID: Int? = nil) {
+        self.name = name
+        self.linkedUserID = linkedUserID
     }
 }
 

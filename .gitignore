@@ -3,6 +3,7 @@
 xcuserdata/
 *.xcuserstate
 DerivedData/
+.derivedData/
 .build/
 *.moved-aside
 *.pbxuser
@@ -13,3 +14,9 @@ DerivedData/
 !default.mode2v3
 *.perspectivev3
 !default.perspectivev3
+
+# KBO spike scratch (keep SPIKE.md + probe script)
+Scripts/kbo_spike/out/
+Scripts/kbo_spike/*.json
+Scripts/kbo_spike/*.html
+Scripts/kbo_spike/help_*.html

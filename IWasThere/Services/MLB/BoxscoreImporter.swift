@@ -3,6 +3,7 @@ import SwiftData
 
 enum GameImportError: LocalizedError {
     case duplicateGame(Int)
+    case duplicateGameKey(String)
     case notFinal
     case missingScores
 
@@ -10,6 +11,8 @@ enum GameImportError: LocalizedError {
         switch self {
         case .duplicateGame(let pk):
             return "Game \(pk) is already in your log."
+        case .duplicateGameKey(let key):
+            return "Game \(key) is already in your log."
         case .notFinal:
             return "Only Final games can be added so the box score is complete."
         case .missingScores:
@@ -49,6 +52,8 @@ enum BoxscoreImporter {
 
         let game = AttendedGame(
             mlbGamePk: scheduleGame.gamePk,
+            league: .mlb,
+            gameKey: LeagueKey.mlb(scheduleGame.gamePk),
             gameDate: calendarDay,
             firstPitchAt: firstPitch,
             officialDateString: scheduleGame.officialDate
@@ -64,6 +69,7 @@ enum BoxscoreImporter {
             homeWon: scheduleGame.teams.home.isWinner ?? (homeScore > awayScore),
             awayWon: scheduleGame.teams.away.isWinner ?? (awayScore > homeScore)
         )
+        game.gameTypeCode = scheduleGame.gameType ?? ""
 
         if let awayName = StarterBackfill.starterName(from: boxscore.teams.away) {
             game.awayStarterName = awayName
@@ -125,19 +131,31 @@ enum BoxscoreImporter {
                     position: player.position?.abbreviation ?? "P",
                     isPitcher: true
                 )
-                row.isPitcher = true
+                let hasBattingLine = row.atBats > 0 || row.plateAppearances > 0 || row.hits > 0
+                if hasBattingLine {
+                    row.isPitcher = false
+                } else {
+                    row.isPitcher = true
+                    if row.position.isEmpty {
+                        row.position = player.position?.abbreviation ?? "P"
+                    }
+                }
                 row.playerName = player.person.fullName
                 row.jerseyNumber = player.jerseyNumber ?? row.jerseyNumber
                 row.teamID = teamID
-                if row.position.isEmpty {
-                    row.position = player.position?.abbreviation ?? "P"
-                }
                 if let pitching {
                     row.inningsPitchedOuts = outs
                     row.earnedRuns = pitching.earnedRuns ?? 0
                     row.strikeouts = pitching.strikeOuts ?? 0
                     row.hitsAllowed = pitching.hits ?? 0
                     row.walksAllowed = pitching.baseOnBalls ?? 0
+                    row.battersFaced = pitching.battersFaced
+                        ?? StatFormulas.estimatedBattersFaced(
+                            hits: row.hitsAllowed,
+                            walks: row.walksAllowed,
+                            strikeouts: row.strikeouts,
+                            outsRecorded: outs
+                        )
                     row.pitcherWins = pitching.wins ?? 0
                     row.pitcherLosses = pitching.losses ?? 0
                     row.pitcherRole = Self.pitcherRole(from: pitching)
@@ -147,6 +165,9 @@ enum BoxscoreImporter {
         }
 
         game.playerStats = Array(byPlayer.values)
+        for stat in game.playerStats {
+            stat.game = game
+        }
         return game
     }
 

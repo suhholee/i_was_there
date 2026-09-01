@@ -12,7 +12,7 @@ struct GameDetailView: View {
     @State private var detailTab: DetailTab = .diary
     @State private var isEditingDiary = false
     @State private var draftEventTitle = ""
-    @State private var draftCompanions = ""
+    @State private var draftFriendNames: [String] = []
     @State private var draftNote = ""
 
     @State private var lineSegment: LineSegment = .batters
@@ -23,7 +23,10 @@ struct GameDetailView: View {
     @State private var newPhotoItems: [PhotosPickerItem] = []
     @State private var enlargedPhotoPath: String?
 
-    private var favoriteTeamID: Int? { profiles.first?.favoriteTeamID }
+    private var favoriteTeamID: Int? {
+        let league = game.resolvedLeague
+        return profiles.first?.favoriteTeamID(for: league)
+    }
 
     private var scoreColor: Color {
         if let winnerID = game.winningTeamID {
@@ -133,8 +136,8 @@ struct GameDetailView: View {
                 .lineLimit(1)
             Text(game.localDateTimeLabelLong)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
-            if !game.venueName.isEmpty {
-                Text(game.venueName)
+            if !game.resolvedVenueName.isEmpty {
+                Text(game.resolvedVenueName)
                     .foregroundStyle(DesignTokens.cardSecondaryText)
             }
             Text(game.startersLabel)
@@ -150,8 +153,8 @@ struct GameDetailView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(DesignTokens.accent)
             }
-            if !game.companions.isEmpty {
-                Text("w/ \(game.companions)")
+            if !game.friendsLabel.isEmpty {
+                Text("w/ \(game.friendsLabel)")
                     .font(.subheadline)
                     .foregroundStyle(DesignTokens.cardSecondaryText)
             }
@@ -167,6 +170,9 @@ struct GameDetailView: View {
         if isPitcher {
             value = mvp.era.map { String(format: "%.2f ERA", $0) }
                 ?? StatFormulas.formatIP(outs: mvp.inningsPitchedOuts) + " IP"
+        } else if game.resolvedLeague == .kbo {
+            value = mvp.battingAverage.map { String(format: "%.3f AVG", $0) }
+                ?? "\(mvp.hits) H"
         } else {
             value = mvp.ops.map { String(format: "%.3f OPS", $0) } ?? "—"
         }
@@ -176,7 +182,8 @@ struct GameDetailView: View {
                 playerName: mvp.playerName,
                 jerseyNumber: mvp.jerseyNumber,
                 teamID: mvp.teamID,
-                prefersPitching: isPitcher
+                prefersPitching: isPitcher,
+                league: game.resolvedLeague
             )
         } label: {
             JerseyCardView(
@@ -213,12 +220,12 @@ struct GameDetailView: View {
 
             if isEditingDiary {
                 diaryEditor(title: "Event/Giveaway", text: $draftEventTitle)
-                diaryEditor(title: "Friends", text: $draftCompanions)
+                FriendEditorView(friendNames: $draftFriendNames)
                 diaryEditor(title: "Notes", text: $draftNote)
                 photoSection(editing: true)
             } else {
                 diaryReadRow(title: "Event/Giveaway", value: game.eventTitle)
-                diaryReadRow(title: "Friends", value: game.companions)
+                diaryReadRow(title: "Friends", value: game.friendsLabel)
                 diaryReadRow(title: "Notes", value: game.note)
                 photoSection(editing: false)
             }
@@ -310,7 +317,7 @@ struct GameDetailView: View {
 
     private func beginDiaryEdit() {
         draftEventTitle = game.eventTitle
-        draftCompanions = game.companions
+        draftFriendNames = game.friendNames
         draftNote = game.note
         isEditingDiary = true
     }
@@ -322,7 +329,7 @@ struct GameDetailView: View {
 
     private func saveDiaryEdit() {
         game.eventTitle = draftEventTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        game.companions = draftCompanions.trimmingCharacters(in: .whitespacesAndNewlines)
+        GameFriendStore.setFriends(names: draftFriendNames, on: game, modelContext: modelContext)
         game.note = draftNote.trimmingCharacters(in: .whitespacesAndNewlines)
         try? modelContext.save()
         isEditingDiary = false
@@ -436,7 +443,7 @@ struct GameDetailView: View {
         case .batters:
             base = game.playerStats.filter { $0.plateAppearances > 0 || $0.atBats > 0 }
         case .pitchers:
-            base = game.playerStats.filter(\.isPitcher)
+            base = game.playerStats.filter { $0.inningsPitchedOuts > 0 }
         }
 
         return base.sorted { lhs, rhs in
@@ -504,7 +511,8 @@ struct GameDetailView: View {
                 playerName: stat.playerName,
                 jerseyNumber: stat.jerseyNumber,
                 teamID: stat.teamID,
-                prefersPitching: lineSegment == .pitchers || stat.isPitcher
+                prefersPitching: lineSegment == .pitchers || stat.isPitcher,
+                league: game.resolvedLeague
             )
         } label: {
             VStack(alignment: .leading, spacing: 6) {
@@ -652,5 +660,5 @@ private enum PitcherSortKey: String, CaseIterable, Identifiable {
     return NavigationStack {
         GameDetailView(game: game)
     }
-    .modelContainer(for: [UserProfile.self, AttendedGame.self, GamePlayerStat.self, GamePhoto.self], inMemory: true)
+        .modelContainer(for: [UserProfile.self, AttendedGame.self, GamePlayerStat.self, GamePhoto.self, GameFriend.self], inMemory: true)
 }

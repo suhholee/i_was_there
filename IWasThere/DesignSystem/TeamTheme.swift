@@ -61,7 +61,18 @@ struct TeamTheme: Equatable {
         145: .init(primary: 0x27251F, secondary: 0xC4CED4, accent: 0xFFFFFF), // CWS
         146: .init(primary: 0x00A3E0, secondary: 0xEF3340, accent: 0x000000), // MIA
         147: .init(primary: 0x0C2340, secondary: 0xC4CED3, accent: 0xFFFFFF), // NYY
-        158: .init(primary: 0xFFC52F, secondary: 0x12284B, accent: 0xFFFFFF)  // MIL
+        158: .init(primary: 0xFFC52F, secondary: 0x12284B, accent: 0xFFFFFF), // MIL
+        // KBO (synthetic ids from KBOTeamCatalog)
+        9101: .init(primary: 0xFF6600, secondary: 0x000000, accent: 0xFFFFFF), // HH Hanwha
+        9102: .init(primary: 0xEA0029, secondary: 0x000000, accent: 0xFFFFFF), // HT KIA
+        9103: .init(primary: 0x000000, secondary: 0xEB1C24, accent: 0xFFFFFF), // KT
+        9104: .init(primary: 0xC3043F, secondary: 0x000000, accent: 0xFFFFFF), // LG
+        9105: .init(primary: 0x041E42, secondary: 0xED1C24, accent: 0xFFFFFF), // LT Lotte
+        9106: .init(primary: 0x315288, secondary: 0xC4A574, accent: 0xFFFFFF), // NC
+        9107: .init(primary: 0x131230, secondary: 0xED1C24, accent: 0xFFFFFF), // OB Doosan
+        9108: .init(primary: 0xCE0E2D, secondary: 0x000000, accent: 0xFFFFFF), // SK SSG
+        9109: .init(primary: 0x074CA1, secondary: 0xC0C0C0, accent: 0xFFFFFF), // SS Samsung
+        9110: .init(primary: 0x820024, secondary: 0x000000, accent: 0xFFFFFF)  // WO Kiwoom
     ]
 }
 

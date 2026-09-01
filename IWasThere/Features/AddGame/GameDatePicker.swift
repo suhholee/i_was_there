@@ -10,7 +10,6 @@ struct GameDatePicker: View {
     let maxDate: Date
 
     private let calendar = Calendar.current
-    private let weekdaySymbols = Calendar.current.shortWeekdaySymbols
 
     init(
         selectedDate: Binding<Date>,
@@ -88,7 +87,7 @@ struct GameDatePicker: View {
 
             Picker("Year", selection: $draftYear) {
                 ForEach(yearOptions, id: \.self) { year in
-                    Text(YearFormat.string(year)).tag(year)
+                    YearFormat.text(year).tag(year)
                 }
             }
             .pickerStyle(.wheel)
@@ -104,7 +103,7 @@ struct GameDatePicker: View {
                 isPickingMonthYear = true
             } label: {
                 HStack {
-                    Text(monthYearLabel)
+                    Text(verbatim: monthYearLabel)
                         .font(.headline)
                         .foregroundStyle(DesignTokens.primaryText)
                     Image(systemName: "chevron.down")
@@ -119,30 +118,62 @@ struct GameDatePicker: View {
     }
 
     private var dayGrid: some View {
-        let days = daysInDisplayedMonth
-        let leadingBlanks = leadingBlankDays
-
-        return VStack(spacing: 8) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
-                ForEach(weekdaySymbols, id: \.self) { symbol in
+        VStack(spacing: 8) {
+            LazyVGrid(columns: gridColumns, spacing: 8) {
+                ForEach(orderedWeekdaySymbols, id: \.self) { symbol in
                     Text(symbol)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(DesignTokens.secondaryText)
                         .frame(maxWidth: .infinity)
                 }
+            }
 
-                ForEach(0..<leadingBlanks, id: \.self) { _ in
-                    Color.clear.frame(height: 36)
-                }
-
-                ForEach(days, id: \.self) { day in
-                    dayButton(day)
+            LazyVGrid(columns: gridColumns, spacing: 8) {
+                ForEach(dayGridCells) { cell in
+                    switch cell {
+                    case .spacer:
+                        Color.clear.frame(height: 36)
+                    case .day(let day):
+                        dayButton(day)
+                    }
                 }
             }
         }
         .padding(12)
         .background(DesignTokens.surface)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var gridColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible()), count: 7)
+    }
+
+    /// Weekday labels aligned with `calendar.firstWeekday`.
+    private var orderedWeekdaySymbols: [String] {
+        let symbols = calendar.shortWeekdaySymbols
+        let start = calendar.firstWeekday - 1
+        guard !symbols.isEmpty, start < symbols.count else { return symbols }
+        return Array(symbols[start...]) + Array(symbols[..<start])
+    }
+
+    private var dayGridCells: [DayGridCell] {
+        let spacers = (0..<leadingBlankDays).map(DayGridCell.spacer)
+        let days = daysInDisplayedMonth.map(DayGridCell.day)
+        return spacers + days
+    }
+
+    private enum DayGridCell: Identifiable {
+        case spacer(Int)
+        case day(Int)
+
+        var id: String {
+            switch self {
+            case .spacer(let index):
+                "spacer-\(index)"
+            case .day(let day):
+                "day-\(day)"
+            }
+        }
     }
 
     private func dayButton(_ day: Int) -> some View {
