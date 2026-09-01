@@ -347,3 +347,115 @@ struct MLBSeasonStatLine: Decodable {
     let gamesStarted: Int?
     let saves: Int?
 }
+
+extension MLBSeasonStatLine {
+    static func mergedHitting(_ lines: [MLBSeasonStatLine]) -> MLBSeasonStatLine? {
+        guard !lines.isEmpty else { return nil }
+
+        let gamesPlayed = lines.compactMap(\.gamesPlayed).reduce(0, +)
+        let atBats = lines.compactMap(\.atBats).reduce(0, +)
+        let hits = lines.compactMap(\.hits).reduce(0, +)
+        let doubles = lines.compactMap(\.doubles).reduce(0, +)
+        let triples = lines.compactMap(\.triples).reduce(0, +)
+        let homeRuns = lines.compactMap(\.homeRuns).reduce(0, +)
+        let rbi = lines.compactMap(\.rbi).reduce(0, +)
+        let walks = lines.compactMap(\.baseOnBalls).reduce(0, +)
+        let strikeOuts = lines.compactMap(\.strikeOuts).reduce(0, +)
+        let hitByPitch = lines.compactMap(\.hitByPitch).reduce(0, +)
+        let sacFlies = lines.compactMap(\.sacFlies).reduce(0, +)
+        let totalBases = lines.compactMap(\.totalBases).reduce(0, +)
+        let runs = lines.compactMap(\.runs).reduce(0, +)
+        let plateAppearances = lines.compactMap(\.plateAppearances).reduce(0, +)
+
+        let obpValue = StatFormulas.onBasePercentage(
+            hits: hits,
+            walks: walks,
+            hitByPitch: hitByPitch,
+            atBats: atBats,
+            sacFlies: sacFlies
+        )
+        let slgValue = StatFormulas.slugging(totalBases: totalBases, atBats: atBats)
+        let opsValue = StatFormulas.ops(
+            hits: hits,
+            walks: walks,
+            hitByPitch: hitByPitch,
+            atBats: atBats,
+            sacFlies: sacFlies,
+            totalBases: totalBases
+        )
+
+        return MLBSeasonStatLine(
+            gamesPlayed: gamesPlayed,
+            avg: StatFormulas.formatAverage(StatFormulas.battingAverage(hits: hits, atBats: atBats)),
+            obp: StatFormulas.formatAverage(obpValue),
+            slg: StatFormulas.formatAverage(slgValue),
+            ops: StatFormulas.formatAverage(opsValue),
+            atBats: atBats,
+            hits: hits,
+            doubles: doubles,
+            triples: triples,
+            homeRuns: homeRuns,
+            rbi: rbi,
+            baseOnBalls: walks,
+            strikeOuts: strikeOuts,
+            hitByPitch: hitByPitch,
+            sacFlies: sacFlies,
+            totalBases: totalBases,
+            runs: runs,
+            plateAppearances: plateAppearances,
+            era: nil,
+            whip: nil,
+            inningsPitched: nil,
+            earnedRuns: nil,
+            wins: nil,
+            losses: nil,
+            gamesStarted: nil,
+            saves: nil
+        )
+    }
+
+    static func mergedPitching(_ lines: [MLBSeasonStatLine]) -> MLBSeasonStatLine? {
+        guard !lines.isEmpty else { return nil }
+
+        let gamesPlayed = lines.compactMap(\.gamesPlayed).reduce(0, +)
+        let gamesStarted = lines.compactMap(\.gamesStarted).reduce(0, +)
+        let wins = lines.compactMap(\.wins).reduce(0, +)
+        let losses = lines.compactMap(\.losses).reduce(0, +)
+        let saves = lines.compactMap(\.saves).reduce(0, +)
+        let earnedRuns = lines.compactMap(\.earnedRuns).reduce(0, +)
+        let strikeOuts = lines.compactMap(\.strikeOuts).reduce(0, +)
+        let hitsAllowed = lines.compactMap(\.hits).reduce(0, +)
+        let walks = lines.compactMap(\.baseOnBalls).reduce(0, +)
+        let outs = lines.compactMap { StatFormulas.outs(fromInningsPitched: $0.inningsPitched) }.reduce(0, +)
+
+        return MLBSeasonStatLine(
+            gamesPlayed: gamesPlayed,
+            avg: nil,
+            obp: nil,
+            slg: nil,
+            ops: nil,
+            atBats: nil,
+            hits: hitsAllowed,
+            doubles: nil,
+            triples: nil,
+            homeRuns: nil,
+            rbi: nil,
+            baseOnBalls: walks,
+            strikeOuts: strikeOuts,
+            hitByPitch: nil,
+            sacFlies: nil,
+            totalBases: nil,
+            runs: nil,
+            plateAppearances: nil,
+            era: StatFormulas.formatRate(StatFormulas.era(earnedRuns: earnedRuns, outs: outs), digits: 2),
+            whip: StatFormulas.formatRate(StatFormulas.whip(hits: hitsAllowed, walks: walks, outs: outs), digits: 2),
+            inningsPitched: StatFormulas.formatIP(outs: outs),
+            earnedRuns: earnedRuns,
+            wins: wins,
+            losses: losses,
+            gamesStarted: gamesStarted,
+            saves: saves
+        )
+    }
+}
+
