@@ -17,6 +17,10 @@ final class UserProfile {
     var homeMinPlateAppearances: Int
     /// Min total batters faced to qualify for Home → Your leaders (pitchers).
     var homeMinBattersFaced: Int
+    /// `LeaderboardEngine.BatterCategory.rawValue` for Home / game batter leaders.
+    var homeBatterStat: String
+    /// `LeaderboardEngine.PitcherCategory.rawValue` for Home / game pitcher leaders.
+    var homePitcherStat: String
 
     init(
         displayName: String = "",
@@ -27,7 +31,9 @@ final class UserProfile {
         activeLeague: String = League.mlb.rawValue,
         favoritePlayerIDs: [Int] = [],
         homeMinPlateAppearances: Int = 0,
-        homeMinBattersFaced: Int = 0
+        homeMinBattersFaced: Int = 0,
+        homeBatterStat: String = LeaderboardEngine.BatterCategory.ops.rawValue,
+        homePitcherStat: String = LeaderboardEngine.PitcherCategory.era.rawValue
     ) {
         self.displayName = displayName
         self.favoriteTeamID = favoriteTeamID
@@ -38,6 +44,8 @@ final class UserProfile {
         self.favoritePlayerIDs = favoritePlayerIDs
         self.homeMinPlateAppearances = homeMinPlateAppearances
         self.homeMinBattersFaced = homeMinBattersFaced
+        self.homeBatterStat = homeBatterStat
+        self.homePitcherStat = homePitcherStat
     }
 
     var league: League {
@@ -61,6 +69,37 @@ final class UserProfile {
             favoriteKBOTeamID = id
             favoriteKBOTeamAbbr = abbr
         }
+    }
+
+    func isFavoritePlayer(_ playerID: Int) -> Bool {
+        favoritePlayerIDs.contains(playerID)
+    }
+
+    func toggleFavoritePlayer(_ playerID: Int) {
+        if let index = favoritePlayerIDs.firstIndex(of: playerID) {
+            favoritePlayerIDs.remove(at: index)
+        } else {
+            favoritePlayerIDs.append(playerID)
+        }
+    }
+
+    func homeBatterCategory(for league: League) -> LeaderboardEngine.BatterCategory {
+        LeaderboardEngine.resolvedBatterCategory(
+            rawValue: homeBatterStat,
+            league: league
+        )
+    }
+
+    func homePitcherCategory() -> LeaderboardEngine.PitcherCategory {
+        LeaderboardEngine.resolvedPitcherCategory(rawValue: homePitcherStat)
+    }
+
+    func setHomeBatterCategory(_ category: LeaderboardEngine.BatterCategory) {
+        homeBatterStat = category.rawValue
+    }
+
+    func setHomePitcherCategory(_ category: LeaderboardEngine.PitcherCategory) {
+        homePitcherStat = category.rawValue
     }
 }
 
@@ -439,11 +478,14 @@ final class GameFriend {
 @Model
 final class GamePhoto {
     var relativePath: String
+    /// Supabase Storage object path when synced.
+    var cloudStoragePath: String = ""
     var createdAt: Date
     var game: AttendedGame?
 
-    init(relativePath: String, createdAt: Date = .now) {
+    init(relativePath: String, cloudStoragePath: String = "", createdAt: Date = .now) {
         self.relativePath = relativePath
+        self.cloudStoragePath = cloudStoragePath
         self.createdAt = createdAt
     }
 }

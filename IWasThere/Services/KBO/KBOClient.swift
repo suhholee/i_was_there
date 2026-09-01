@@ -31,6 +31,16 @@ actor KBOClient {
             .sorted { $0.gameID < $1.gameID }
     }
 
+    /// Locate a schedule row for hydration after cloud restore.
+    func findScheduleGame(gameID: String, gDt: String, season: Int) async throws -> KBOScheduleGame {
+        let date = Self.date(fromGDt: gDt) ?? Date()
+        let games = try await schedule(date: date)
+        if let match = games.first(where: { $0.gameID == gameID }) {
+            return match
+        }
+        throw KBOClientError.gameNotFound(gameID)
+    }
+
     /// KBO first-team games (`le_id=1`, `sp_id=1`) including postseason (`sr_id` ≠ `0`).
     private static func isFirstTeamKBOGame(_ dto: KBOScheduleGameDTO) -> Bool {
         let leagueOK = dto.le_id == "1" || dto.le_id == nil
@@ -145,6 +155,15 @@ actor KBOClient {
         }
     }
 
+    static func date(fromGDt gDt: String) -> Date? {
+        guard gDt.count == 8,
+              let year = Int(gDt.prefix(4)),
+              let month = Int(gDt.dropFirst(4).prefix(2)),
+              let day = Int(gDt.suffix(2))
+        else { return nil }
+        return Calendar.current.date(from: DateComponents(year: year, month: month, day: day))
+    }
+
     static func gDt(from date: Date) -> String {
         let cal = Calendar.current
         let y = cal.component(.year, from: date)
@@ -158,12 +177,14 @@ enum KBOClientError: LocalizedError {
     case badURL
     case badStatus(Int)
     case decode(Error)
+    case gameNotFound(String)
 
     var errorDescription: String? {
         switch self {
         case .badURL: return "Invalid KBO API URL."
         case .badStatus(let code): return "KBO API error (\(code))."
         case .decode: return "Could not read KBO API response."
+        case .gameNotFound(let id): return "KBO game \(id) not found on schedule."
         }
     }
 }

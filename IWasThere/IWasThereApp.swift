@@ -14,7 +14,7 @@ struct IWasThereApp: App {
         WindowGroup {
             Group {
                 if let container {
-                    RootTabView()
+                    AppRootView()
                         .modelContainer(container)
                 } else {
                     LaunchLoadingView()
@@ -24,11 +24,14 @@ struct IWasThereApp: App {
                 guard container == nil else { return }
                 container = Self.makeContainer()
             }
+            .onOpenURL { url in
+                Task { await AuthSession.shared.handleIncomingURL(url) }
+            }
         }
     }
 
     /// Bump when the SwiftData schema changes incompatibly (e.g. adding `GameFriend`).
-    private static let storeSchemaVersion = 2
+    private static let storeSchemaVersion = 4
     private static let schemaVersionKey = "IWasThereStoreSchemaVersion"
 
     private static func makeContainer() -> ModelContainer {

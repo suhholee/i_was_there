@@ -28,6 +28,15 @@ struct GameDetailView: View {
         return profiles.first?.favoriteTeamID(for: league)
     }
 
+    private var batterLeaderCategory: LeaderboardEngine.BatterCategory {
+        profiles.first?.homeBatterCategory(for: game.resolvedLeague)
+            ?? (game.resolvedLeague == .kbo ? .avg : .ops)
+    }
+
+    private var pitcherLeaderCategory: LeaderboardEngine.PitcherCategory {
+        profiles.first?.homePitcherCategory() ?? .era
+    }
+
     private var scoreColor: Color {
         if let winnerID = game.winningTeamID {
             return TeamTheme.forTeamID(winnerID).primary
@@ -43,12 +52,19 @@ struct GameDetailView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
 
-                    let mvps = LeaderboardEngine.gameMVPs(in: game)
-                    if let batter = mvps.batter {
-                        mvpCard(batter, isPitcher: false)
+                    let topBatter = LeaderboardEngine.gameLeaderBatter(
+                        in: game,
+                        category: batterLeaderCategory
+                    )
+                    let topPitcher = LeaderboardEngine.gameLeaderPitcher(
+                        in: game,
+                        category: pitcherLeaderCategory
+                    )
+                    if let batter = topBatter {
+                        gameLeaderCard(batter, isPitcher: false, category: batterLeaderCategory)
                     }
-                    if let pitcher = mvps.pitcher {
-                        mvpCard(pitcher, isPitcher: true)
+                    if let pitcher = topPitcher {
+                        gameLeaderCard(pitcher, isPitcher: true, category: pitcherLeaderCategory)
                     }
 
                     Picker("Section", selection: $detailTab) {
@@ -165,33 +181,55 @@ struct GameDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private func mvpCard(_ mvp: GamePlayerStat, isPitcher: Bool) -> some View {
-        let value: String
-        if isPitcher {
-            value = mvp.era.map { String(format: "%.2f ERA", $0) }
-                ?? StatFormulas.formatIP(outs: mvp.inningsPitchedOuts) + " IP"
-        } else if game.resolvedLeague == .kbo {
-            value = mvp.battingAverage.map { String(format: "%.3f AVG", $0) }
-                ?? "\(mvp.hits) H"
-        } else {
-            value = mvp.ops.map { String(format: "%.3f OPS", $0) } ?? "—"
-        }
-        return NavigationLink {
+    private func gameLeaderCard(
+        _ stat: GamePlayerStat,
+        isPitcher: Bool,
+        category: LeaderboardEngine.BatterCategory
+    ) -> some View {
+        gameLeaderCard(
+            stat,
+            isPitcher: isPitcher,
+            valueLabel: category.display(for: stat),
+            subtitle: "Top batter · \(category.title)"
+        )
+    }
+
+    private func gameLeaderCard(
+        _ stat: GamePlayerStat,
+        isPitcher: Bool,
+        category: LeaderboardEngine.PitcherCategory
+    ) -> some View {
+        gameLeaderCard(
+            stat,
+            isPitcher: isPitcher,
+            valueLabel: category.display(for: stat),
+            subtitle: "Top pitcher · \(category.title)"
+        )
+    }
+
+    private func gameLeaderCard(
+        _ stat: GamePlayerStat,
+        isPitcher: Bool,
+        valueLabel: String,
+        subtitle: String
+    ) -> some View {
+        NavigationLink {
             PlayerDetailView(
-                playerID: mvp.playerID,
-                playerName: mvp.playerName,
-                jerseyNumber: mvp.jerseyNumber,
-                teamID: mvp.teamID,
+                playerID: stat.playerID,
+                playerName: stat.playerName,
+                jerseyNumber: stat.jerseyNumber,
+                teamID: stat.teamID,
                 prefersPitching: isPitcher,
                 league: game.resolvedLeague
             )
         } label: {
             JerseyCardView(
-                number: mvp.jerseyNumber,
-                name: mvp.playerName,
-                subtitle: "Game MVP",
-                valueLabel: value,
-                theme: TeamTheme.forTeamID(mvp.teamID)
+                number: stat.jerseyNumber,
+                name: stat.playerName,
+                subtitle: subtitle,
+                valueLabel: valueLabel,
+                theme: TeamTheme.forTeamID(stat.teamID),
+                compact: true
             )
         }
         .buttonStyle(.plain)
@@ -333,6 +371,7 @@ struct GameDetailView: View {
         game.note = draftNote.trimmingCharacters(in: .whitespacesAndNewlines)
         try? modelContext.save()
         isEditingDiary = false
+        CloudSyncTrigger.game(game, modelContext: modelContext)
     }
 
     private func importPhotos(_ items: [PhotosPickerItem]) async {
@@ -349,6 +388,7 @@ struct GameDetailView: View {
         }
         newPhotoItems = []
         try? modelContext.save()
+        CloudSyncTrigger.game(game, modelContext: modelContext)
     }
 
     private func deletePhoto(_ photo: GamePhoto) {
@@ -521,8 +561,10 @@ struct GameDetailView: View {
                         .font(.caption.monospacedDigit().weight(.bold))
                         .foregroundStyle(DesignTokens.accent)
                     Text(stat.playerName)
-                        .font(.headline)
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(DesignTokens.cardPrimaryText)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                     Spacer()
                     Text(stat.position)
                         .font(.caption)
@@ -554,7 +596,7 @@ struct GameDetailView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
+            .padding(12)
             .background(DesignTokens.cardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }

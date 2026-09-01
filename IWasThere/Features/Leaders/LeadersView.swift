@@ -17,10 +17,38 @@ struct LeadersView: View {
     @State private var friendFilter: String = ""
     @State private var batterPosition: LeaderboardEngine.BatterPositionFilter = .all
     @State private var pitcherRole: LeaderboardEngine.PitcherRoleFilter = .all
-    @State private var displayedRows: [LeaderboardEngine.PlayerAggregate] = []
+    @State private var allLeaderRows: [LeaderboardEngine.PlayerAggregate] = []
+    @State private var visibleLeaderCount = LeadersView.pageSize
+    @State private var searchablePlayers: [LeaderboardEngine.SearchPlayerResult] = []
+    @State private var playerSearchQuery = ""
     @State private var cachedMVPCounts: [Int: Int] = [:]
     @State private var mvpCacheKey: String = ""
-    @State private var isSearchingPlayers = false
+
+    private static let pageSize = 20
+
+    private var visibleLeaderRows: [LeaderboardEngine.PlayerAggregate] {
+        Array(allLeaderRows.prefix(visibleLeaderCount))
+    }
+
+    private var hasMoreLeaders: Bool {
+        visibleLeaderCount < allLeaderRows.count
+    }
+
+    private var trimmedSearchQuery: String {
+        playerSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isSearching: Bool {
+        !trimmedSearchQuery.isEmpty
+    }
+
+    private var filteredSearchResults: [LeaderboardEngine.SearchPlayerResult] {
+        guard isSearching else { return [] }
+        return searchablePlayers.filter { row in
+            row.playerName.localizedCaseInsensitiveContains(trimmedSearchQuery)
+                || row.jerseyNumber.localizedCaseInsensitiveContains(trimmedSearchQuery)
+        }
+    }
 
     private var activeLeague: League { profiles.first?.league ?? .mlb }
     private var favoriteTeamID: Int? { profiles.first?.favoriteTeamID(for: activeLeague) }
@@ -81,9 +109,14 @@ struct LeadersView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
 
+                playerSearchBar
+                    .padding(.horizontal)
+
                 filtersBar
 
-                if games.isEmpty {
+                if isSearching {
+                    searchResultsContent
+                } else if games.isEmpty {
                     ContentUnavailableView(
                         "No \(activeLeague.title) attendance leaders yet",
                         systemImage: "tshirt",
@@ -91,7 +124,7 @@ struct LeadersView: View {
                     )
                     .foregroundStyle(DesignTokens.primaryText)
                     .frame(maxHeight: .infinity)
-                } else if displayedRows.isEmpty {
+                } else if allLeaderRows.isEmpty {
                     ContentUnavailableView(
                         "No players match",
                         systemImage: "line.3.horizontal.decrease.circle",
@@ -102,7 +135,7 @@ struct LeadersView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 10) {
-                            ForEach(Array(displayedRows.enumerated()), id: \.element.id) { index, row in
+                            ForEach(Array(visibleLeaderRows.enumerated()), id: \.element.id) { index, row in
                                 NavigationLink {
                                     PlayerDetailView(
                                         playerID: row.playerID,
@@ -123,6 +156,19 @@ struct LeadersView: View {
                                 }
                                 .buttonStyle(.plain)
                             }
+
+                            if hasMoreLeaders {
+                                Button {
+                                    visibleLeaderCount += Self.pageSize
+                                } label: {
+                                    Text("See more")
+                                        .font(.subheadline)
+                                        .foregroundStyle(DesignTokens.secondaryText)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 8)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                         .padding(.horizontal)
                         .padding(.bottom, 24)
@@ -138,30 +184,6 @@ struct LeadersView: View {
             .toolbarBackground(DesignTokens.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        isSearchingPlayers = true
-                    } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.body.weight(.semibold))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(DesignTokens.primaryText)
-                    .disabled(games.isEmpty)
-                }
-            }
-            .sheet(isPresented: $isSearchingPlayers) {
-                LeaderPlayerSearchView(
-                    isPresented: $isSearchingPlayers,
-                    league: activeLeague,
-                    games: filteredGames,
-                    season: nil,
-                    teamID: nil,
-                    minPlateAppearances: minPlateAppearances,
-                    minBattersFaced: minBattersFaced
-                )
-            }
             .onAppear {
                 normalizeBatterCategory()
                 refreshRows()
@@ -194,6 +216,31 @@ struct LeadersView: View {
             minBattersFaced: minBattersFaced,
             gameKeys: games.map(\.mlbGamePk)
         )
+    }
+
+    private var playerSearchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(DesignTokens.secondaryText)
+
+            TextField(searchPlaceholder, text: $playerSearchQuery)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .foregroundStyle(DesignTokens.primaryText)
+
+            if !playerSearchQuery.isEmpty {
+                Button {
+                    playerSearchQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(DesignTokens.secondaryText)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(10)
+        .background(DesignTokens.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var filtersBar: some View {
@@ -242,6 +289,68 @@ struct LeadersView: View {
                     FilterChip(title: pitcherRole.title)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var searchResultsContent: some View {
+        if searchablePlayers.isEmpty {
+            ContentUnavailableView(
+                "No players match filters",
+                systemImage: "person.crop.circle.badge.questionmark",
+                description: Text("Adjust Leaders filters or minimum playing time in Settings.")
+            )
+            .foregroundStyle(DesignTokens.primaryText)
+            .frame(maxHeight: .infinity)
+        } else if filteredSearchResults.isEmpty {
+            ContentUnavailableView.search(text: playerSearchQuery)
+                .frame(maxHeight: .infinity)
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(filteredSearchResults) { row in
+                        NavigationLink {
+                            PlayerDetailView(
+                                playerID: row.playerID,
+                                playerName: row.playerName,
+                                jerseyNumber: row.jerseyNumber,
+                                teamID: row.teamID,
+                                prefersPitching: segment == .pitchers,
+                                league: activeLeague
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(row.playerName)
+                                    .font(.headline)
+                                    .foregroundStyle(DesignTokens.primaryText)
+                                Text("\(row.roleLabel) · \(row.aggregate.games) game\(row.aggregate.games == 1 ? "" : "s") · \(searchSummary(for: row))")
+                                    .font(.caption)
+                                    .foregroundStyle(DesignTokens.secondaryText)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(14)
+                            .background(DesignTokens.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 24)
+            }
+        }
+    }
+
+    private var searchPlaceholder: String {
+        segment == .batters ? "Search batters" : "Search pitchers"
+    }
+
+    private func searchSummary(for row: LeaderboardEngine.SearchPlayerResult) -> String {
+        switch segment {
+        case .batters:
+            return "\(batterCategory.title) \(batterCategory.display(row.aggregate))"
+        case .pitchers:
+            return "\(pitcherCategory.title) \(pitcherCategory.display(row.aggregate))"
         }
     }
 
@@ -294,6 +403,7 @@ struct LeadersView: View {
                 season: nil,
                 teamID: nil,
                 position: batterPosition,
+                limit: 1_000,
                 minPlateAppearances: minPlateAppearances,
                 mvpCounts: cachedMVPCounts
             )
@@ -304,6 +414,7 @@ struct LeadersView: View {
                 season: nil,
                 teamID: nil,
                 role: pitcherRole,
+                limit: 1_000,
                 minBattersFaced: minBattersFaced,
                 mvpCounts: cachedMVPCounts
             )
@@ -312,8 +423,18 @@ struct LeadersView: View {
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            displayedRows = next
+            allLeaderRows = next
+            visibleLeaderCount = Self.pageSize
         }
+
+        searchablePlayers = LeaderboardEngine.searchablePlayers(
+            from: filteredGames,
+            pitchersOnly: segment == .pitchers,
+            season: nil,
+            teamID: nil,
+            minPlateAppearances: minPlateAppearances,
+            minBattersFaced: minBattersFaced
+        )
     }
 }
 

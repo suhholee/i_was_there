@@ -202,6 +202,46 @@ enum LeaderboardEngine {
                 return "\(row.mvpCount)"
             }
         }
+
+        func value(for stat: GamePlayerStat) -> Double? {
+            switch self {
+            case .avg: stat.battingAverage
+            case .ops: stat.ops
+            case .hr: Double(stat.homeRuns)
+            case .rbi: Double(stat.rbi)
+            case .hits: Double(stat.hits)
+            case .runs: Double(stat.runs)
+            case .mvp: nil
+            }
+        }
+
+        func qualifies(_ stat: GamePlayerStat) -> Bool {
+            switch self {
+            case .avg, .ops: stat.atBats >= 1
+            case .hr, .rbi, .hits, .runs: stat.plateAppearances >= 1 || stat.atBats >= 1
+            case .mvp: true
+            }
+        }
+
+        func display(for stat: GamePlayerStat) -> String {
+            switch self {
+            case .avg:
+                return formatRate(stat.battingAverage) + " AVG"
+            case .ops:
+                guard let ops = stat.ops else { return "— OPS" }
+                return String(format: "%.3f OPS", ops)
+            case .hr:
+                return "\(stat.homeRuns) HR"
+            case .rbi:
+                return "\(stat.rbi) RBI"
+            case .hits:
+                return "\(stat.hits) H"
+            case .runs:
+                return "\(stat.runs) R"
+            case .mvp:
+                return "Game MVP"
+            }
+        }
     }
 
     enum PitcherCategory: String, CaseIterable, Identifiable {
@@ -256,6 +296,96 @@ enum LeaderboardEngine {
             case .mvp:
                 return "\(row.mvpCount)"
             }
+        }
+
+        func value(for stat: GamePlayerStat) -> Double? {
+            switch self {
+            case .era: stat.era
+            case .whip: stat.whip
+            case .so: Double(stat.strikeouts)
+            case .ip: Double(stat.inningsPitchedOuts)
+            case .mvp: nil
+            }
+        }
+
+        func qualifies(_ stat: GamePlayerStat) -> Bool {
+            switch self {
+            case .mvp: true
+            default: stat.inningsPitchedOuts >= 3
+            }
+        }
+
+        func display(for stat: GamePlayerStat) -> String {
+            switch self {
+            case .era:
+                return formatERA(stat.era) + " ERA"
+            case .whip:
+                return formatWHIP(stat.whip) + " WHIP"
+            case .so:
+                return "\(stat.strikeouts) K"
+            case .ip:
+                return StatFormulas.formatIP(outs: stat.inningsPitchedOuts) + " IP"
+            case .mvp:
+                return "Game MVP"
+            }
+        }
+    }
+
+    static func batterCategories(for league: League) -> [BatterCategory] {
+        switch league {
+        case .mlb:
+            return Array(BatterCategory.allCases)
+        case .kbo:
+            return [.avg, .hits, .runs, .rbi, .mvp]
+        }
+    }
+
+    static func resolvedBatterCategory(
+        rawValue: String,
+        league: League
+    ) -> BatterCategory {
+        let allowed = batterCategories(for: league)
+        guard let parsed = BatterCategory(rawValue: rawValue),
+              allowed.contains(parsed) else {
+            return league == .kbo ? .avg : .ops
+        }
+        return parsed
+    }
+
+    static func resolvedPitcherCategory(rawValue: String) -> PitcherCategory {
+        guard let parsed = PitcherCategory(rawValue: rawValue) else { return .era }
+        return parsed
+    }
+
+    static func gameLeaderBatter(
+        in game: AttendedGame,
+        category: BatterCategory
+    ) -> GamePlayerStat? {
+        if category == .mvp {
+            return gameMVPs(in: game).batter
+        }
+        let batters = game.playerStats.filter { category.qualifies($0) }
+        return batters.max { lhs, rhs in
+            let left = category.value(for: lhs) ?? -.infinity
+            let right = category.value(for: rhs) ?? -.infinity
+            if left == right { return lhs.playerName < rhs.playerName }
+            return left < right
+        }
+    }
+
+    static func gameLeaderPitcher(
+        in game: AttendedGame,
+        category: PitcherCategory
+    ) -> GamePlayerStat? {
+        if category == .mvp {
+            return gameMVPs(in: game).pitcher
+        }
+        let pitchers = game.playerStats.filter { category.qualifies($0) }
+        return pitchers.max { lhs, rhs in
+            let left = category.value(for: lhs) ?? (category.higherIsBetter ? -.infinity : .infinity)
+            let right = category.value(for: rhs) ?? (category.higherIsBetter ? -.infinity : .infinity)
+            if left == right { return lhs.playerName < rhs.playerName }
+            return category.higherIsBetter ? left < right : left > right
         }
     }
 
@@ -432,6 +562,66 @@ enum LeaderboardEngine {
             default: ""
             }
         }
+    }
+
+    /// Players eligible for leader search for the active Batters/Pitchers segment.
+    static func searchablePlayers(
+        from games: [AttendedGame],
+        pitchersOnly: Bool,
+        season: Int? = nil,
+        teamID: Int? = nil,
+        minPlateAppearances: Int = 0,
+        minBattersFaced: Int = 0
+    ) -> [SearchPlayerResult] {
+        if pitchersOnly {
+            let pitcherMVP = mvpCounts(from: games, season: season, pitchers: true)
+            let pitchers = pitcherLeaders(
+                from: games,
+                category: .ip,
+                season: season,
+                teamID: teamID,
+                role: .all,
+                limit: 1_000,
+                minBattersFaced: minBattersFaced,
+                mvpCounts: pitcherMVP
+            )
+            return pitchers.map {
+                SearchPlayerResult(
+                    playerID: $0.playerID,
+                    playerName: $0.playerName,
+                    jerseyNumber: $0.jerseyNumber,
+                    teamID: $0.teamID,
+                    aggregate: $0,
+                    isBatter: false,
+                    isPitcher: true
+                )
+            }
+            .sorted { $0.playerName.localizedCaseInsensitiveCompare($1.playerName) == .orderedAscending }
+        }
+
+        let batterMVP = mvpCounts(from: games, season: season, pitchers: false)
+        let batters = batterLeaders(
+            from: games,
+            category: .hits,
+            season: season,
+            teamID: teamID,
+            position: .all,
+            limit: 1_000,
+            minPlateAppearances: minPlateAppearances,
+            mvpCounts: batterMVP
+        )
+        return batters.map {
+            SearchPlayerResult(
+                playerID: $0.playerID,
+                playerName: $0.playerName,
+                jerseyNumber: $0.jerseyNumber,
+                teamID: $0.teamID,
+                aggregate: $0,
+                isBatter: true,
+                isPitcher: false
+            )
+        }
+        .sorted { $0.playerName.localizedCaseInsensitiveCompare($1.playerName) == .orderedAscending }
     }
 
     /// All qualifying batters and pitchers for search (ignores Batters/Pitchers segment).
@@ -620,5 +810,75 @@ enum LeaderboardEngine {
     private static func formatWHIP(_ value: Double?) -> String {
         guard let value else { return "—" }
         return String(format: "%.2f", value)
+    }
+
+    struct FavoritePlayerSummary: Identifiable, Hashable {
+        let playerID: Int
+        var playerName: String
+        var jerseyNumber: String
+        var teamID: Int
+        var batter: PlayerAggregate?
+        var pitcher: PlayerAggregate?
+
+        var id: Int { playerID }
+
+        var prefersPitching: Bool {
+            pitcher != nil && batter == nil
+        }
+    }
+
+    static func favoritePlayerSummaries(
+        from games: [AttendedGame],
+        playerIDs: [Int],
+        league: League,
+        batterCategory: BatterCategory,
+        pitcherCategory: PitcherCategory,
+        minPlateAppearances: Int = 0,
+        minBattersFaced: Int = 0
+    ) -> [FavoritePlayerSummary] {
+        guard !playerIDs.isEmpty else { return [] }
+
+        let batterMVP = mvpCounts(from: games, season: nil, pitchers: false)
+        let pitcherMVP = mvpCounts(from: games, season: nil, pitchers: true)
+        let batters = batterLeaders(
+            from: games,
+            category: batterCategory,
+            limit: 5_000,
+            minPlateAppearances: minPlateAppearances,
+            mvpCounts: batterMVP
+        )
+        let pitchers = pitcherLeaders(
+            from: games,
+            category: pitcherCategory,
+            limit: 5_000,
+            minBattersFaced: minBattersFaced,
+            mvpCounts: pitcherMVP
+        )
+        let batterByID = Dictionary(uniqueKeysWithValues: batters.map { ($0.playerID, $0) })
+        let pitcherByID = Dictionary(uniqueKeysWithValues: pitchers.map { ($0.playerID, $0) })
+
+        return playerIDs.compactMap { playerID in
+            let batter = batterByID[playerID]
+            let pitcher = pitcherByID[playerID]
+            guard batter != nil || pitcher != nil else {
+                return FavoritePlayerSummary(
+                    playerID: playerID,
+                    playerName: "Player \(playerID)",
+                    jerseyNumber: "",
+                    teamID: batter?.teamID ?? pitcher?.teamID ?? 0,
+                    batter: nil,
+                    pitcher: nil
+                )
+            }
+            let merged = mergeSearchAggregates(batter: batter, pitcher: pitcher)
+            return FavoritePlayerSummary(
+                playerID: playerID,
+                playerName: merged.playerName,
+                jerseyNumber: merged.jerseyNumber,
+                teamID: merged.teamID,
+                batter: batter,
+                pitcher: pitcher
+            )
+        }
     }
 }

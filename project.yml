@@ -5,6 +5,10 @@ options:
     iOS: "17.0"
   xcodeVersion: "16.0"
   createIntermediateGroups: true
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: 2.0.0
 settings:
   BASE_SDK: iphoneos
   TARGETED_DEVICE_FAMILY: "1"
@@ -16,6 +20,16 @@ targets:
     platform: iOS
     sources:
       - path: IWasThere
+        excludes:
+          - "Config/SupabaseConfig.example.plist"
+      - path: IWasThere/Config/SupabaseConfig.plist
+        buildPhase: resources
+        optional: true
+    entitlements:
+      path: IWasThere/IWasThere.entitlements
+    dependencies:
+      - package: Supabase
+        product: Supabase
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.suhholee.iwasthere
       INFOPLIST_KEY_CFBundleDisplayName: "#iWasThere"
@@ -26,5 +40,7 @@ targets:
       GENERATE_INFOPLIST_FILE: YES
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: IWasThere/Info.plist
     scheme:
       testTargets: []

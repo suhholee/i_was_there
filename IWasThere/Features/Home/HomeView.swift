@@ -39,7 +39,7 @@ struct HomeView: View {
     private var topPitchers: [LeaderboardEngine.PlayerAggregate] {
         LeaderboardEngine.pitcherLeaders(
             from: games,
-            category: .era,
+            category: homePitcherCategory,
             limit: 3,
             minBattersFaced: profile?.homeMinBattersFaced ?? 0
         )
@@ -59,15 +59,31 @@ struct HomeView: View {
         guard let favoriteTeamID else { return [] }
         return LeaderboardEngine.pitcherLeaders(
             from: games,
-            category: .era,
+            category: homePitcherCategory,
             teamID: favoriteTeamID,
             limit: 3
         )
     }
 
-    /// KBO box lines lack full OPS inputs; prefer AVG on Home.
+    private var favoritePlayers: [LeaderboardEngine.FavoritePlayerSummary] {
+        guard let ids = profile?.favoritePlayerIDs, !ids.isEmpty else { return [] }
+        return LeaderboardEngine.favoritePlayerSummaries(
+            from: games,
+            playerIDs: ids,
+            league: activeLeague,
+            batterCategory: homeBatterCategory,
+            pitcherCategory: homePitcherCategory,
+            minPlateAppearances: profile?.homeMinPlateAppearances ?? 0,
+            minBattersFaced: profile?.homeMinBattersFaced ?? 0
+        )
+    }
+
     private var homeBatterCategory: LeaderboardEngine.BatterCategory {
-        activeLeague == .kbo ? .avg : .ops
+        profile?.homeBatterCategory(for: activeLeague) ?? (activeLeague == .kbo ? .avg : .ops)
+    }
+
+    private var homePitcherCategory: LeaderboardEngine.PitcherCategory {
+        profile?.homePitcherCategory() ?? .era
     }
 
     var body: some View {
@@ -89,6 +105,10 @@ struct HomeView: View {
                     }
 
                     favoriteTeamCard
+
+                    if !favoritePlayers.isEmpty {
+                        favoritePlayersSection
+                    }
 
                     if !games.isEmpty {
                         if favoriteTeamID != nil {
@@ -244,6 +264,61 @@ struct HomeView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    private var favoritePlayersSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Favorite players")
+                .font(.headline)
+                .foregroundStyle(DesignTokens.primaryText)
+
+            ForEach(favoritePlayers) { player in
+                favoritePlayerCard(player)
+            }
+        }
+    }
+
+    private func favoritePlayerCard(_ player: LeaderboardEngine.FavoritePlayerSummary) -> some View {
+        let hasStats = player.batter != nil || player.pitcher != nil
+        let isPitcher = player.prefersPitching
+        let subtitle: String
+        let value: String
+
+        if let batter = player.batter, !isPitcher {
+            subtitle = hasStats
+                ? "Favorite · \(homeBatterCategory.title) · \(gamesLabel(batter.games))"
+                : "Favorite · log a game to see stats"
+            value = hasStats ? homeBatterCategory.display(batter) : "—"
+        } else if let pitcher = player.pitcher {
+            subtitle = hasStats
+                ? "Favorite · \(homePitcherCategory.title) · \(gamesLabel(pitcher.games))"
+                : "Favorite · log a game to see stats"
+            value = hasStats ? homePitcherCategory.display(pitcher) : "—"
+        } else {
+            subtitle = "Favorite · log a game to see stats"
+            value = "—"
+        }
+
+        return NavigationLink {
+            PlayerDetailView(
+                playerID: player.playerID,
+                playerName: player.playerName,
+                jerseyNumber: player.jerseyNumber,
+                teamID: player.teamID,
+                prefersPitching: isPitcher,
+                league: activeLeague
+            )
+        } label: {
+            JerseyCardView(
+                number: player.jerseyNumber,
+                name: player.playerName,
+                subtitle: subtitle,
+                valueLabel: value,
+                theme: TeamTheme.forTeamID(player.teamID),
+                compact: true
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private func miniLeadersSection(
         title: String,
         batters: [LeaderboardEngine.PlayerAggregate],
@@ -295,8 +370,8 @@ struct HomeView: View {
                         JerseyCardView(
                             number: pitcher.jerseyNumber,
                             name: pitcher.playerName,
-                            subtitle: "Top pitcher · ERA · \(gamesLabel(pitcher.games))",
-                            valueLabel: LeaderboardEngine.PitcherCategory.era.display(pitcher),
+                            subtitle: "Top pitcher · \(homePitcherCategory.title) · \(gamesLabel(pitcher.games))",
+                            valueLabel: homePitcherCategory.display(pitcher),
                             theme: TeamTheme.forTeamID(pitcher.teamID),
                             compact: true
                         )
