@@ -6,15 +6,40 @@ struct AddGameView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var existingGames: [AttendedGame]
+    @Query private var profiles: [UserProfile]
 
-    @StateObject private var viewModel = AddGameViewModel()
+    @StateObject private var viewModel: AddGameViewModel
     @State private var isPickingMonthYear = false
     @State private var draftMonth = Calendar.current.component(.month, from: .now)
     @State private var draftYear = Calendar.current.component(.year, from: .now)
     var onSaved: ((AttendedGame) -> Void)?
 
+    init(league: League? = nil, onSaved: ((AttendedGame) -> Void)? = nil) {
+        let resolved = league ?? .mlb
+        _viewModel = StateObject(wrappedValue: AddGameViewModel(league: resolved))
+        self.onSaved = onSaved
+    }
+
+    private var activeLeague: League {
+        profiles.first?.league ?? viewModel.league
+    }
+
+    private var leagueGames: [AttendedGame] {
+        existingGames.filter { $0.resolvedLeague == viewModel.league }
+    }
+
     private var existingGamePks: Set<Int> {
-        Set(existingGames.map(\.mlbGamePk))
+        Set(leagueGames.map(\.mlbGamePk))
+    }
+
+    private var existingGameKeys: Set<String> {
+        Set(leagueGames.map { game in
+            if !game.gameKey.isEmpty { return game.gameKey }
+            if game.resolvedLeague == .kbo, !game.kboGameID.isEmpty {
+                return LeagueKey.kbo(game.kboGameID)
+            }
+            return LeagueKey.mlb(game.mlbGamePk)
+        })
     }
 
     var body: some View {
@@ -25,7 +50,7 @@ struct AddGameView: View {
                 content
             }
             .background(DesignTokens.background.ignoresSafeArea())
-            .navigationTitle("Add game")
+            .navigationTitle("Add \(viewModel.league.title) game")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -91,6 +116,15 @@ struct AddGameView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(DesignTokens.primaryText)
 
+                if viewModel.league == .kbo {
+                    YearFormat.verbatim(
+                        "Box scores work best from %@ onward.",
+                        year: League.kbo.earliestImportSeason
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(DesignTokens.secondaryText)
+                }
+
             GameDatePicker(
                 selectedDate: $viewModel.selectedDate,
                 isPickingMonthYear: $isPickingMonthYear,
@@ -116,7 +150,7 @@ struct AddGameView: View {
                     if viewModel.isLoading {
                         ProgressView().tint(.white)
                     }
-                    Text(isPickingMonthYear ? "Select month" : "Find MLB games")
+                    Text(isPickingMonthYear ? "Select month" : viewModel.findGamesButtonTitle)
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
@@ -134,6 +168,7 @@ struct AddGameView: View {
                 draftMonth: &draftMonth,
                 draftYear: &draftYear
             )
+            _ = activeLeague
         }
     }
 
@@ -152,7 +187,7 @@ struct AddGameView: View {
             .padding(.horizontal)
 
             if let info = viewModel.infoMessage {
-                Text(info)
+                Text(verbatim: info)
                     .font(.footnote)
                     .foregroundStyle(DesignTokens.secondaryText)
                     .padding(.horizontal)
@@ -169,58 +204,10 @@ struct AddGameView: View {
                 ProgressView("Loading schedule…")
                     .tint(DesignTokens.accent)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if viewModel.games.isEmpty {
-                ContentUnavailableView(
-                    "No games found",
-                    systemImage: "calendar.badge.exclamationmark",
-                    description: Text(viewModel.infoMessage ?? "Try another date.")
-                )
-                .foregroundStyle(DesignTokens.primaryText)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.league == .mlb {
+                mlbMatchList
             } else {
-                List(viewModel.games, id: \.gamePk) { game in
-                    let alreadyLogged = existingGamePks.contains(game.gamePk)
-                    Button {
-                        guard !alreadyLogged else { return }
-                        viewModel.selectedGame = game
-                    } label: {
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: viewModel.selectedGame?.gamePk == game.gamePk ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(
-                                    alreadyLogged
-                                        ? DesignTokens.secondaryText.opacity(0.35)
-                                        : (viewModel.selectedGame?.gamePk == game.gamePk ? DesignTokens.accent : DesignTokens.secondaryText)
-                                )
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(game.matchupLabel)
-                                    .font(.headline)
-                                    .foregroundStyle(alreadyLogged ? DesignTokens.secondaryText : DesignTokens.primaryText)
-                                Text("\(game.scoreLabel) · \(game.status.detailedState)")
-                                    .font(.subheadline)
-                                    .foregroundStyle(DesignTokens.secondaryText)
-                                if let venue = game.venue?.name {
-                                    Text(venue)
-                                        .font(.caption)
-                                        .foregroundStyle(DesignTokens.secondaryText)
-                                }
-                                if alreadyLogged {
-                                    Text("Already logged")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(DesignTokens.secondaryText)
-                                } else if !game.isFinal {
-                                    Text("Not final — can't import box score yet")
-                                        .font(.caption)
-                                        .foregroundStyle(.orange)
-                                }
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    .disabled(!game.isFinal || alreadyLogged)
-                    .listRowBackground(DesignTokens.surface)
-                }
-                .scrollContentBackground(.hidden)
+                kboMatchList
             }
 
             Button {
@@ -241,6 +228,115 @@ struct AddGameView: View {
         .padding(.top)
     }
 
+    private var mlbMatchList: some View {
+        Group {
+            if viewModel.mlbGames.isEmpty {
+                emptyMatchState
+            } else {
+                List(viewModel.mlbGames, id: \.gamePk) { game in
+                    let alreadyLogged = existingGamePks.contains(game.gamePk)
+                    Button {
+                        guard !alreadyLogged else { return }
+                        viewModel.selectedMLBGame = game
+                    } label: {
+                        matchRow(
+                            selected: viewModel.selectedMLBGame?.gamePk == game.gamePk,
+                            alreadyLogged: alreadyLogged,
+                            matchup: game.matchupLabel,
+                            detail: "\(game.scoreLabel) · \(game.status.detailedState)",
+                            venue: game.venue?.name,
+                            isFinal: game.isFinal
+                        )
+                    }
+                    .disabled(!game.isFinal || alreadyLogged)
+                    .listRowBackground(DesignTokens.surface)
+                }
+                .scrollContentBackground(.hidden)
+            }
+        }
+    }
+
+    private var kboMatchList: some View {
+        Group {
+            if viewModel.kboGames.isEmpty {
+                emptyMatchState
+            } else {
+                List(viewModel.kboGames) { game in
+                    let key = LeagueKey.kbo(game.gameID)
+                    let alreadyLogged = existingGameKeys.contains(key)
+                    Button {
+                        guard !alreadyLogged else { return }
+                        viewModel.selectedKBOGame = game
+                    } label: {
+                        matchRow(
+                            selected: viewModel.selectedKBOGame?.gameID == game.gameID,
+                            alreadyLogged: alreadyLogged,
+                            matchup: game.matchupLabel,
+                            detail: game.isFinal ? "Final" : "Not final",
+                            venue: nil,
+                            isFinal: game.isFinal
+                        )
+                    }
+                    .disabled(!game.isFinal || alreadyLogged)
+                    .listRowBackground(DesignTokens.surface)
+                }
+                .scrollContentBackground(.hidden)
+            }
+        }
+    }
+
+    private var emptyMatchState: some View {
+        ContentUnavailableView(
+            "No games found",
+            systemImage: "calendar.badge.exclamationmark",
+                    description: Text(verbatim: viewModel.infoMessage ?? "Try another date.")
+        )
+        .foregroundStyle(DesignTokens.primaryText)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func matchRow(
+        selected: Bool,
+        alreadyLogged: Bool,
+        matchup: String,
+        detail: String,
+        venue: String?,
+        isFinal: Bool
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(
+                    alreadyLogged
+                        ? DesignTokens.secondaryText.opacity(0.35)
+                        : (selected ? DesignTokens.accent : DesignTokens.secondaryText)
+                )
+            VStack(alignment: .leading, spacing: 4) {
+                Text(matchup)
+                    .font(.headline)
+                    .foregroundStyle(alreadyLogged ? DesignTokens.secondaryText : DesignTokens.primaryText)
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(DesignTokens.secondaryText)
+                if let venue {
+                    Text(venue)
+                        .font(.caption)
+                        .foregroundStyle(DesignTokens.secondaryText)
+                }
+                if alreadyLogged {
+                    Text("Already logged")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(DesignTokens.secondaryText)
+                } else if !isFinal {
+                    Text("Not final — can't import box score yet")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+    }
+
     private var diaryStep: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -251,8 +347,8 @@ struct AddGameView: View {
                         Label("Back", systemImage: "chevron.left")
                     }
                     Spacer()
-                    if let game = viewModel.selectedGame {
-                        Text(game.matchupLabel)
+                    if let label = viewModel.selectedMatchupLabel {
+                        Text(label)
                             .font(.caption)
                             .foregroundStyle(DesignTokens.secondaryText)
                             .lineLimit(1)
@@ -264,7 +360,7 @@ struct AddGameView: View {
                     .foregroundStyle(DesignTokens.primaryText)
 
                 diaryField(title: "Event/Giveaway", text: $viewModel.eventTitle)
-                diaryField(title: "Friends", text: $viewModel.companions)
+                FriendEditorView(friendNames: $viewModel.friendNames, appearance: .addGameDiary)
                 diaryField(title: "Notes", text: $viewModel.note)
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -294,7 +390,8 @@ struct AddGameView: View {
                     Task {
                         if let saved = await viewModel.save(
                             modelContext: modelContext,
-                            existingGamePks: existingGamePks
+                            existingGamePks: existingGamePks,
+                            existingGameKeys: existingGameKeys
                         ) {
                             onSaved?(saved)
                             dismiss()
@@ -335,12 +432,19 @@ struct AddGameView: View {
     }
 
     private var canContinueToDiary: Bool {
-        guard let game = viewModel.selectedGame else { return false }
-        return game.isFinal && !existingGamePks.contains(game.gamePk)
+        guard viewModel.canContinueToDiary else { return false }
+        switch viewModel.league {
+        case .mlb:
+            guard let game = viewModel.selectedMLBGame else { return false }
+            return !existingGamePks.contains(game.gamePk)
+        case .kbo:
+            guard let game = viewModel.selectedKBOGame else { return false }
+            return !existingGameKeys.contains(LeagueKey.kbo(game.gameID))
+        }
     }
 }
 
 #Preview {
-    AddGameView()
-        .modelContainer(for: [UserProfile.self, AttendedGame.self, GamePlayerStat.self, GamePhoto.self], inMemory: true)
+    AddGameView(league: .mlb)
+        .modelContainer(for: [UserProfile.self, AttendedGame.self, GamePlayerStat.self, GamePhoto.self, GameFriend.self], inMemory: true)
 }

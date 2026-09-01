@@ -4,34 +4,52 @@ import SwiftData
 struct GamesView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.teamTheme) private var teamTheme
-    @Query(sort: \AttendedGame.gameDate, order: .reverse) private var games: [AttendedGame]
+    @Query(sort: \AttendedGame.gameDate, order: .reverse) private var allGames: [AttendedGame]
     @Query private var profiles: [UserProfile]
     @State private var showingAddGame = false
-    /// `0` = All teams
+    /// `0` = all seasons
+    @State private var seasonFilter: Int = 0
+    /// `0` = all teams
     @State private var filterTeamID: Int = 0
+    @State private var gamePhaseFilter: GamePhaseFilter = .all
+    @State private var venueFilter: String = ""
+    @State private var favoriteResultFilter: FavoriteResultFilter = .all
+    @State private var friendFilter: String = ""
 
-    private var favoriteTeamID: Int? { profiles.first?.favoriteTeamID }
+    private var activeLeague: League { profiles.first?.league ?? .mlb }
+    private var favoriteTeamID: Int? { profiles.first?.favoriteTeamID(for: activeLeague) }
 
-    private var teamsInLog: [MLBTeamInfo] {
-        var seen = Set<Int>()
-        var result: [MLBTeamInfo] = []
-        for game in games {
-            for id in [game.homeTeamID, game.awayTeamID] {
-                guard seen.insert(id).inserted else { continue }
-                if let known = MLBTeamCatalog.team(id: id) {
-                    result.append(known)
-                } else {
-                    let name = game.homeTeamID == id ? game.homeTeamName : game.awayTeamName
-                    result.append(MLBTeamInfo(id: id, name: name, abbreviation: "TEAM"))
-                }
-            }
-        }
-        return MLBTeamCatalog.orderedForPicker(favoring: favoriteTeamID, from: result)
+    private var games: [AttendedGame] {
+        allGames.filter { $0.resolvedLeague == activeLeague }
+    }
+
+    private var seasonsInLog: [Int] {
+        GameLogFilter.seasons(in: games)
+    }
+
+    private var teamsInLog: [GameFilterTeam] {
+        GameLogFilter.teams(in: games, league: activeLeague, favoriteTeamID: favoriteTeamID)
+    }
+
+    private var venuesInLog: [String] {
+        GameLogFilter.venues(in: games)
+    }
+
+    private var friendsInLog: [String] {
+        GameLogFilter.friends(in: games)
     }
 
     private var filteredGames: [AttendedGame] {
-        guard filterTeamID != 0 else { return games }
-        return games.filter { $0.homeTeamID == filterTeamID || $0.awayTeamID == filterTeamID }
+        GameLogFilter.apply(
+            to: games,
+            season: seasonFilter == 0 ? nil : seasonFilter,
+            teamID: filterTeamID == 0 ? nil : filterTeamID,
+            phase: gamePhaseFilter,
+            venue: venueFilter.isEmpty ? nil : venueFilter,
+            favoriteResult: favoriteResultFilter,
+            favoriteTeamID: favoriteTeamID,
+            friend: friendFilter.isEmpty ? nil : friendFilter
+        )
     }
 
     var body: some View {
@@ -41,30 +59,40 @@ struct GamesView: View {
 
                 if games.isEmpty {
                     ContentUnavailableView {
-                        Label("No games yet", systemImage: "baseball.diamond.bases")
+                        Label("No \(activeLeague.title) games yet", systemImage: "baseball.diamond.bases")
                     } description: {
                         Text("Log a game to your iWasThere Diary!")
                             .foregroundStyle(DesignTokens.secondaryText)
                     } actions: {
                         Button("Add game") { showingAddGame = true }
                             .buttonStyle(.borderedProminent)
-                            // Fixed brand red — team accents are often white and hide the label.
                             .tint(DesignTokens.accent)
                             .foregroundStyle(.white)
                     }
                     .foregroundStyle(DesignTokens.primaryText)
                 } else {
                     VStack(spacing: 0) {
-                        teamFilterBar
-                            .padding(.horizontal, 16)
-                            .padding(.top, 8)
-                            .padding(.bottom, 4)
+                        GameAttendanceFiltersBar(
+                            seasonFilter: $seasonFilter,
+                            teamFilter: $filterTeamID,
+                            gamePhaseFilter: $gamePhaseFilter,
+                            venueFilter: $venueFilter,
+                            favoriteResultFilter: $favoriteResultFilter,
+                            friendFilter: $friendFilter,
+                            seasonsInLog: seasonsInLog,
+                            teamsInLog: teamsInLog,
+                            venuesInLog: venuesInLog,
+                            friendsInLog: friendsInLog,
+                            favoriteTeamID: favoriteTeamID
+                        )
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
 
                         if filteredGames.isEmpty {
                             ContentUnavailableView(
-                                "No games for this team",
+                                "No games match",
                                 systemImage: "line.3.horizontal.decrease.circle",
-                                description: Text("Try another team filter.")
+                                description: Text("Try another year, team, stadium, or filter.")
                             )
                             .foregroundStyle(DesignTokens.primaryText)
                             .frame(maxHeight: .infinity)
@@ -87,8 +115,9 @@ struct GamesView: View {
                     }
                 }
             }
-            .navigationTitle("Games")
+            .navigationTitle("\(activeLeague.title) Games")
             .navigationBarTitleDisplayMode(.inline)
+            .tint(DesignTokens.primaryText)
             .toolbarBackground(DesignTokens.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
@@ -98,55 +127,36 @@ struct GamesView: View {
                         showingAddGame = true
                     } label: {
                         Image(systemName: "plus")
+                            .font(.body.weight(.semibold))
                     }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(DesignTokens.primaryText)
                 }
             }
             .sheet(isPresented: $showingAddGame) {
-                AddGameView()
+                AddGameView(league: activeLeague)
                     .environment(\.modelContext, modelContext)
             }
+            .onChange(of: activeLeague) { _, _ in
+                resetFilters()
+            }
             .task(id: games.map(\.mlbGamePk)) {
+                try? await Task.sleep(for: .milliseconds(300))
                 for game in games {
                     await StarterBackfill.ensureStarters(for: game, modelContext: modelContext)
+                    await Task.yield()
                 }
             }
         }
     }
 
-    private var selectedTeamFilterLabel: String {
-        if filterTeamID == 0 { return "All teams" }
-        if let team = teamsInLog.first(where: { $0.id == filterTeamID }) {
-            return MLBTeamCatalog.pickerLabel(for: team, favoriteID: favoriteTeamID)
-        }
-        return "Team"
-    }
-
-    private var teamFilterBar: some View {
-        Menu {
-            Button("All teams") { filterTeamID = 0 }
-            ForEach(teamsInLog) { team in
-                Button(MLBTeamCatalog.pickerLabel(for: team, favoriteID: favoriteTeamID)) {
-                    filterTeamID = team.id
-                }
-            }
-        } label: {
-            HStack(spacing: 10) {
-                Text(selectedTeamFilterLabel)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(DesignTokens.primaryText)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(DesignTokens.secondaryText)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(DesignTokens.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
+    private func resetFilters() {
+        seasonFilter = 0
+        filterTeamID = 0
+        gamePhaseFilter = .all
+        venueFilter = ""
+        favoriteResultFilter = .all
+        friendFilter = ""
     }
 
     private func gameCard(_ game: AttendedGame) -> some View {
@@ -168,6 +178,17 @@ struct GamesView: View {
             Text(game.startersLabel)
                 .font(.caption)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
+            if let phase = game.gamePhaseShortLabel {
+                Text(phase)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DesignTokens.cardSecondaryText)
+            }
+            if !game.resolvedVenueName.isEmpty {
+                Text(game.resolvedVenueName)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.cardSecondaryText)
+                    .lineLimit(1)
+            }
             if let attendance = game.attendanceLabel {
                 Text(attendance)
                     .font(.caption)
@@ -179,8 +200,8 @@ struct GamesView: View {
                     .foregroundStyle(DesignTokens.accent)
                     .lineLimit(2)
             }
-            if !game.companions.isEmpty {
-                Text("w/ \(game.companions)")
+            if !game.friendsLabel.isEmpty {
+                Text("w/ \(game.friendsLabel)")
                     .font(.caption)
                     .foregroundStyle(DesignTokens.cardSecondaryText)
                     .lineLimit(1)
@@ -198,5 +219,5 @@ struct GamesView: View {
 
 #Preview {
     GamesView()
-        .modelContainer(for: [UserProfile.self, AttendedGame.self, GamePlayerStat.self, GamePhoto.self], inMemory: true)
+        .modelContainer(for: [UserProfile.self, AttendedGame.self, GamePlayerStat.self, GamePhoto.self, GameFriend.self], inMemory: true)
 }

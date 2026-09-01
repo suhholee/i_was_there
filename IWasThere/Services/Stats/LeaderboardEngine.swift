@@ -35,8 +35,13 @@ enum LeaderboardEngine {
         var strikeouts: Int = 0
         var hitsAllowed: Int = 0
         var walksAllowed: Int = 0
+        var battersFaced: Int = 0
 
         var id: Int { playerID }
+
+        var effectivePlateAppearances: Int {
+            plateAppearances > 0 ? plateAppearances : atBats
+        }
 
         var lastName: String {
             guard let last = playerName.split(separator: " ").last else { return playerName }
@@ -270,8 +275,7 @@ enum LeaderboardEngine {
         }
 
         var winPercentageLabel: String {
-            guard let winPercentage else { return "—" }
-            return String(format: "%.3f", winPercentage).replacingOccurrences(of: "0.", with: ".")
+            StatFormulas.formatWinPercentage(winPercentage)
         }
     }
 
@@ -305,7 +309,15 @@ enum LeaderboardEngine {
         var roleCounts: [Int: [String: Int]] = [:]
 
         for game in scoped {
-            for stat in game.playerStats where stat.isPitcher == pitchers {
+            for stat in game.playerStats {
+                let isBatterLine = stat.plateAppearances > 0 || stat.atBats > 0
+                let isPitcherLine = stat.inningsPitchedOuts > 0
+                if pitchers {
+                    guard isPitcherLine else { continue }
+                } else {
+                    guard isBatterLine else { continue }
+                }
+
                 if let teamID, stat.teamID != teamID { continue }
 
                 let role: String
@@ -354,6 +366,15 @@ enum LeaderboardEngine {
                 row.strikeouts += stat.strikeouts
                 row.hitsAllowed += stat.hitsAllowed
                 row.walksAllowed += stat.walksAllowed
+                let faced = stat.battersFaced > 0
+                    ? stat.battersFaced
+                    : StatFormulas.estimatedBattersFaced(
+                        hits: stat.hitsAllowed,
+                        walks: stat.walksAllowed,
+                        strikeouts: stat.strikeouts,
+                        outsRecorded: stat.inningsPitchedOuts
+                    )
+                row.battersFaced += faced
                 map[stat.playerID] = row
             }
         }
@@ -375,6 +396,7 @@ enum LeaderboardEngine {
         teamID: Int? = nil,
         position: BatterPositionFilter = .all,
         limit: Int = 20,
+        minPlateAppearances: Int = 0,
         mvpCounts: [Int: Int]? = nil
     ) -> [PlayerAggregate] {
         var rows = aggregates(
@@ -385,8 +407,103 @@ enum LeaderboardEngine {
             batterPosition: position
         )
         applyMVPCounts(&rows, from: games, season: season, pitchers: false, cached: mvpCounts)
-        rows = rows.filter { category.qualifies($0) }
+        rows = rows.filter {
+            category.qualifies($0) && $0.effectivePlateAppearances >= minPlateAppearances
+        }
         return sorted(rows, by: category.value, higherIsBetter: category.higherIsBetter, limit: limit)
+    }
+
+    struct SearchPlayerResult: Identifiable, Hashable {
+        let playerID: Int
+        var playerName: String
+        var jerseyNumber: String
+        var teamID: Int
+        var aggregate: PlayerAggregate
+        var isBatter: Bool
+        var isPitcher: Bool
+
+        var id: Int { playerID }
+
+        var roleLabel: String {
+            switch (isBatter, isPitcher) {
+            case (true, true): "Batter · Pitcher"
+            case (true, false): "Batter"
+            case (false, true): "Pitcher"
+            default: ""
+            }
+        }
+    }
+
+    /// All qualifying batters and pitchers for search (ignores Batters/Pitchers segment).
+    static func searchablePlayers(
+        from games: [AttendedGame],
+        season: Int? = nil,
+        teamID: Int? = nil,
+        minPlateAppearances: Int = 0,
+        minBattersFaced: Int = 0
+    ) -> [SearchPlayerResult] {
+        let batterMVP = mvpCounts(from: games, season: season, pitchers: false)
+        let pitcherMVP = mvpCounts(from: games, season: season, pitchers: true)
+
+        let batters = batterLeaders(
+            from: games,
+            category: .hits,
+            season: season,
+            teamID: teamID,
+            position: .all,
+            limit: 1_000,
+            minPlateAppearances: minPlateAppearances,
+            mvpCounts: batterMVP
+        )
+        let pitchers = pitcherLeaders(
+            from: games,
+            category: .ip,
+            season: season,
+            teamID: teamID,
+            role: .all,
+            limit: 1_000,
+            minBattersFaced: minBattersFaced,
+            mvpCounts: pitcherMVP
+        )
+
+        var batterByID = Dictionary(uniqueKeysWithValues: batters.map { ($0.playerID, $0) })
+        var pitcherByID = Dictionary(uniqueKeysWithValues: pitchers.map { ($0.playerID, $0) })
+        let allIDs = Set(batterByID.keys).union(pitcherByID.keys)
+
+        return allIDs.map { playerID in
+            let batter = batterByID[playerID]
+            let pitcher = pitcherByID[playerID]
+            let merged = mergeSearchAggregates(batter: batter, pitcher: pitcher)
+            return SearchPlayerResult(
+                playerID: playerID,
+                playerName: merged.playerName,
+                jerseyNumber: merged.jerseyNumber,
+                teamID: merged.teamID,
+                aggregate: merged,
+                isBatter: batter != nil,
+                isPitcher: pitcher != nil
+            )
+        }
+        .sorted { $0.playerName.localizedCaseInsensitiveCompare($1.playerName) == .orderedAscending }
+    }
+
+    private static func mergeSearchAggregates(
+        batter: PlayerAggregate?,
+        pitcher: PlayerAggregate?
+    ) -> PlayerAggregate {
+        guard let batter else { return pitcher! }
+        guard let pitcher else { return batter }
+        var merged = batter
+        merged.games = max(batter.games, pitcher.games)
+        merged.mvpCount = max(batter.mvpCount, pitcher.mvpCount)
+        merged.inningsPitchedOuts = pitcher.inningsPitchedOuts
+        merged.earnedRuns = pitcher.earnedRuns
+        merged.strikeouts = pitcher.strikeouts
+        merged.hitsAllowed = pitcher.hitsAllowed
+        merged.walksAllowed = pitcher.walksAllowed
+        merged.battersFaced = pitcher.battersFaced
+        merged.pitcherRole = pitcher.pitcherRole
+        return merged
     }
 
     static func pitcherLeaders(
@@ -396,6 +513,7 @@ enum LeaderboardEngine {
         teamID: Int? = nil,
         role: PitcherRoleFilter = .all,
         limit: Int = 20,
+        minBattersFaced: Int = 0,
         mvpCounts: [Int: Int]? = nil
     ) -> [PlayerAggregate] {
         var rows = aggregates(
@@ -406,7 +524,9 @@ enum LeaderboardEngine {
             pitcherRole: role
         )
         applyMVPCounts(&rows, from: games, season: season, pitchers: true, cached: mvpCounts)
-        rows = rows.filter { category.qualifies($0) }
+        rows = rows.filter {
+            category.qualifies($0) && $0.battersFaced >= minBattersFaced
+        }
         return sorted(rows, by: category.value, higherIsBetter: category.higherIsBetter, limit: limit)
     }
 
@@ -430,8 +550,8 @@ enum LeaderboardEngine {
     /// Per-game MVPs: best batter line and best pitcher line (when each qualifies).
     /// Batter score ≈ OPS + 0.12×HR + 0.03×RBI; pitcher ≈ IP/K/ER weighting.
     static func gameMVPs(in game: AttendedGame) -> (batter: GamePlayerStat?, pitcher: GamePlayerStat?) {
-        let batters = game.playerStats.filter { !$0.isPitcher && ($0.plateAppearances > 0 || $0.atBats > 0) }
-        let pitchers = game.playerStats.filter { $0.isPitcher && $0.inningsPitchedOuts > 0 }
+        let batters = game.playerStats.filter { $0.plateAppearances > 0 || $0.atBats > 0 }
+        let pitchers = game.playerStats.filter { $0.inningsPitchedOuts > 0 }
         let batter = batters.max(by: { batterMVPScore($0) < batterMVPScore($1) })
         let pitcher = pitchers.max(by: { pitcherMVPScore($0) < pitcherMVPScore($1) })
         return (batter, pitcher)

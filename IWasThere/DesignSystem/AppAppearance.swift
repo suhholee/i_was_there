@@ -20,4 +20,30 @@ enum AppAppearance {
         nav.tintColor = .white
         nav.barStyle = .black
     }
+
+    static func configureTabBar() {
+        let background = UIColor(DesignTokens.background)
+
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = background
+        appearance.shadowColor = .clear
+
+        let item = UITabBarItemAppearance()
+        let white: [NSAttributedString.Key: Any] = [.foregroundColor: UIColor.white]
+        item.normal.iconColor = .white
+        item.normal.titleTextAttributes = white
+        item.selected.iconColor = .white
+        item.selected.titleTextAttributes = white
+        appearance.stackedLayoutAppearance = item
+        appearance.inlineLayoutAppearance = item
+        appearance.compactInlineLayoutAppearance = item
+
+        let tabBar = UITabBar.appearance()
+        tabBar.standardAppearance = appearance
+        tabBar.scrollEdgeAppearance = appearance
+        tabBar.tintColor = .white
+        tabBar.unselectedItemTintColor = .white
+        tabBar.barStyle = .black
+    }
 }

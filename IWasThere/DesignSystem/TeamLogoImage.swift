@@ -1,8 +1,9 @@
 import SwiftUI
 import UIKit
 
-/// Loads a team mark for Home / headers. Uses URLSession (with User-Agent) because
-/// plain `AsyncImage` often fails on device against MLB CDNs.
+/// Team mark for Home / headers.
+/// MLB: remote CDN via URLSession (plain `AsyncImage` often fails on device).
+/// KBO: local assets in `Assets.xcassets` (`kbo_HH`, …).
 struct TeamLogoImage: View {
     let teamID: Int
     var size: CGFloat = 44
@@ -12,18 +13,16 @@ struct TeamLogoImage: View {
 
     var body: some View {
         Group {
-            if let uiImage {
+            if let assetName = KBOTeamCatalog.logoAssetName(forTeamID: teamID) {
+                Image(assetName)
+                    .resizable()
+                    .scaledToFit()
+            } else if let uiImage {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFit()
             } else if failed {
-                Circle()
-                    .fill(TeamTheme.forTeamID(teamID).primary.opacity(0.55))
-                    .overlay {
-                        Text(MLBTeamCatalog.team(id: teamID)?.abbreviation ?? "")
-                            .font(.system(size: size * 0.28, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
+                abbreviationBadge
             } else {
                 Circle()
                     .fill(TeamTheme.forTeamID(teamID).primary.opacity(0.35))
@@ -32,12 +31,35 @@ struct TeamLogoImage: View {
         }
         .frame(width: size, height: size)
         .task(id: teamID) {
-            await load()
+            await loadMLBIfNeeded()
         }
     }
 
+    private var abbreviationBadge: some View {
+        Circle()
+            .fill(TeamTheme.forTeamID(teamID).primary.opacity(0.55))
+            .overlay {
+                Text(abbreviation)
+                    .font(.system(size: size * 0.28, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+    }
+
+    private var abbreviation: String {
+        MLBTeamCatalog.team(id: teamID)?.abbreviation
+            ?? KBOTeamCatalog.team(id: teamID)?.abbreviation
+            ?? ""
+    }
+
     @MainActor
-    private func load() async {
+    private func loadMLBIfNeeded() async {
+        // KBO uses bundled assets — no network fetch.
+        if KBOTeamCatalog.logoAssetName(forTeamID: teamID) != nil {
+            uiImage = nil
+            failed = false
+            return
+        }
+
         uiImage = nil
         failed = false
         guard let candidates = MLBAssetURLs.teamLogoCandidates(teamID: teamID), !candidates.isEmpty else {

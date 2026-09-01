@@ -7,8 +7,13 @@ struct PlayerDetailView: View {
     let jerseyNumber: String
     let teamID: Int
     let prefersPitching: Bool
+    var league: League = .mlb
 
-    @Query(sort: \AttendedGame.gameDate, order: .reverse) private var games: [AttendedGame]
+    @Query(sort: \AttendedGame.gameDate, order: .reverse) private var allGames: [AttendedGame]
+
+    private var games: [AttendedGame] {
+        allGames.filter { $0.resolvedLeague == league }
+    }
     @State private var person: MLBPersonDetail?
     @State private var hittingSplits: [MLBSeasonSplit] = []
     @State private var pitchingSplits: [MLBSeasonSplit] = []
@@ -75,7 +80,11 @@ struct PlayerDetailView: View {
                 }
 
                 sectionCard(title: "Total season (\(YearFormat.string(selectedSeason)))") {
-                    if isLoading {
+                    if league == .kbo {
+                        Text("Full-season KBO totals will land in a follow-up. Attended lines above come from the Sports2i box score.")
+                            .font(.subheadline)
+                            .foregroundStyle(DesignTokens.secondaryText)
+                    } else if isLoading {
                         ProgressView()
                             .tint(DesignTokens.accent)
                     } else if let loadError {
@@ -135,7 +144,8 @@ struct PlayerDetailView: View {
     private var headerSubtitle: String {
         let team = person?.currentTeam?.name
             ?? MLBTeamCatalog.team(id: teamID)?.name
-            ?? "MLB"
+            ?? KBOTeamCatalog.team(id: teamID)?.name
+            ?? league.title
         let pos = person?.primaryPosition?.abbreviation ?? ""
         if pos.isEmpty { return team }
         return "\(team) · \(pos)"
@@ -276,6 +286,11 @@ struct PlayerDetailView: View {
     }
 
     private func loadRemote(force: Bool = false) async {
+        guard league == .mlb else {
+            isLoading = false
+            loadError = nil
+            return
+        }
         if !force, person != nil, (!hittingSplits.isEmpty || !pitchingSplits.isEmpty) { return }
         isLoading = true
         loadError = nil

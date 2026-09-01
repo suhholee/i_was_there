@@ -5,6 +5,9 @@ import SwiftData
 enum StarterBackfill {
     @MainActor
     static func ensureStarters(for game: AttendedGame, modelContext: ModelContext) async {
+        // KBO games are filled at import; MLB Stats API backfill does not apply.
+        guard game.resolvedLeague == .mlb else { return }
+
         let awayEmpty = game.awayStarterName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let homeEmpty = game.homeStarterName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let needsAttendance = (game.attendanceCount ?? 0) <= 0

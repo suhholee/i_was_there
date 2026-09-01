@@ -142,9 +142,41 @@ enum StatFormulas {
         return clamped
     }
 
+    /// Win percentage with leading zero and three decimals: `0.450`.
+    static func formatWinPercentage(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return String(format: "%.3f", value)
+    }
+
+    /// Normalize API win% strings (`.450`, `0.45`, `0.450`) to `0.450`.
+    static func formatWinPercentage(raw: String?) -> String {
+        guard let raw else { return "—" }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != "—" else { return "—" }
+        let normalized: String
+        if trimmed.hasPrefix(".") {
+            normalized = "0" + trimmed
+        } else {
+            normalized = trimmed
+        }
+        guard let value = Double(normalized) else { return "—" }
+        return formatWinPercentage(value)
+    }
+
     static func formatIP(outs: Int) -> String {
         let whole = outs / 3
         let rem = outs % 3
         return "\(whole).\(rem)"
+    }
+
+    /// Estimate batters faced when the box score omits TBF (common in KBO feeds).
+    static func estimatedBattersFaced(
+        hits: Int,
+        walks: Int,
+        strikeouts: Int,
+        outsRecorded: Int
+    ) -> Int {
+        let bipOuts = max(0, outsRecorded - strikeouts)
+        return hits + walks + strikeouts + bipOuts
     }
 }
