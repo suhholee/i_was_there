@@ -43,3 +43,9 @@ In Xcode: select an **iPhone simulator** → press **⌘R**.
 ```bash
 python3 Scripts/smoke_mlb_api.py
 ```
+
+## Backend (cloud sync)
+
+User diary data syncs to **Supabase** after Sign in with Apple. Game scores and player stats are re-fetched from the MLB / KBO APIs — only your profile, attendance list, diary notes, friends, and photos are stored in the cloud.
+
+See [docs/BACKEND.md](docs/BACKEND.md) for setup.

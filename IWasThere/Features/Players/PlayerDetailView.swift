@@ -9,6 +9,8 @@ struct PlayerDetailView: View {
     let prefersPitching: Bool
     var league: League = .mlb
 
+    @Environment(\.modelContext) private var modelContext
+    @Query private var profiles: [UserProfile]
     @Query(sort: \AttendedGame.gameDate, order: .reverse) private var allGames: [AttendedGame]
 
     private var games: [AttendedGame] {
@@ -99,8 +101,18 @@ struct PlayerDetailView: View {
             .padding(16)
         }
         .background(DesignTokens.background.ignoresSafeArea())
-        .navigationTitle(playerName)
+        .navigationTitle(person?.fullName ?? playerName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if let profile = profiles.first {
+                    FavoritePlayerStarButton(playerID: playerID, profile: profile) {
+                        try? modelContext.save()
+                        CloudSyncTrigger.profile(modelContext: modelContext)
+                    }
+                }
+            }
+        }
         .toolbarBackground(DesignTokens.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)

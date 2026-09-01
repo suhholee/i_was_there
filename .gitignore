@@ -20,3 +20,7 @@ Scripts/kbo_spike/out/
 Scripts/kbo_spike/*.json
 Scripts/kbo_spike/*.html
 Scripts/kbo_spike/help_*.html
+
+# Supabase secrets (copy from SupabaseConfig.example.plist)
+IWasThere/Config/SupabaseConfig.plist
+supabase/.temp/

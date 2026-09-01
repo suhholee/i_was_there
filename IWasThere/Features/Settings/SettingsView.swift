@@ -15,8 +15,11 @@ struct SettingsView: View {
     @State private var kboFavoriteID: Int = 0
     @State private var homeMinPA: String = ""
     @State private var homeMinBF: String = ""
+    @State private var homeBatterCategory: LeaderboardEngine.BatterCategory = .ops
+    @State private var homePitcherCategory: LeaderboardEngine.PitcherCategory = .era
     @State private var savedSnapshot = SettingsSnapshot()
     @State private var showUnsavedChangesAlert = false
+    @State private var showSignOutConfirmation = false
 
     private var profile: UserProfile? { profiles.first }
 
@@ -31,8 +34,14 @@ struct SettingsView: View {
             mlbFavoriteID: mlbFavoriteID,
             kboFavoriteID: kboFavoriteID,
             homeMinPlateAppearances: parsedLeaderFilter(homeMinPA),
-            homeMinBattersFaced: parsedLeaderFilter(homeMinBF)
+            homeMinBattersFaced: parsedLeaderFilter(homeMinBF),
+            homeBatterCategory: homeBatterCategory,
+            homePitcherCategory: homePitcherCategory
         )
+    }
+
+    private var settingsBatterCategories: [LeaderboardEngine.BatterCategory] {
+        LeaderboardEngine.batterCategories(for: activeLeague)
     }
 
     private var orderedMLBTeams: [MLBTeamInfo] {
@@ -109,11 +118,22 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Text("MLB and KBO diaries stay separate on this device. Each league keeps its own favorite team.")
-                        .font(.footnote)
-                        .foregroundStyle(DesignTokens.secondaryText)
+                    Picker("Batter stat", selection: $homeBatterCategory) {
+                        ForEach(settingsBatterCategories) { category in
+                            Text(category.title).tag(category)
+                        }
+                    }
+
+                    Picker("Pitcher stat", selection: $homePitcherCategory) {
+                        ForEach(LeaderboardEngine.PitcherCategory.allCases) { category in
+                            Text(category.title).tag(category)
+                        }
+                    }
                 } header: {
-                    settingsSectionHeader("Data")
+                    settingsSectionHeader("Leader stats")
+                } footer: {
+                    Text("Controls the main stat on Home leaders and the top player cards in each game.")
+                        .font(.footnote)
                 }
 
                 Section {
@@ -122,6 +142,27 @@ struct SettingsView: View {
                     LabeledContent("Prototype", value: "KBO mode")
                 } header: {
                     settingsSectionHeader("About")
+                }
+
+                if AuthSession.shared.isAuthenticated {
+                    Section {
+                        NavigationLink {
+                            RemoveAccountView()
+                        } label: {
+                            Text("Remove account")
+                                .foregroundStyle(DesignTokens.loseRed)
+                        }
+
+                        Button {
+                            showSignOutConfirmation = true
+                        } label: {
+                            Text("Sign out")
+                                .font(.body.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .foregroundStyle(DesignTokens.loseRed)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
             .navigationTitle("Settings")
@@ -161,6 +202,17 @@ struct SettingsView: View {
                 saveAll()
                 dismissKeyboard()
                 saveTrigger = false
+            }
+            .onChange(of: activeLeague) { _, _ in
+                normalizeBatterCategory()
+            }
+            .alert("Sign out?", isPresented: $showSignOutConfirmation) {
+                Button("Sign out", role: .destructive) {
+                    Task { await AuthSession.shared.signOut(modelContext: modelContext) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You'll need to sign in again to sync your diary.")
             }
             .alert("Save changes?", isPresented: $showUnsavedChangesAlert) {
                 Button("Save") {
@@ -202,6 +254,8 @@ struct SettingsView: View {
         profile.league = activeLeague
         profile.homeMinPlateAppearances = parsedLeaderFilter(homeMinPA)
         profile.homeMinBattersFaced = parsedLeaderFilter(homeMinBF)
+        profile.setHomeBatterCategory(homeBatterCategory)
+        profile.setHomePitcherCategory(homePitcherCategory)
 
         if mlbFavoriteID == 0 {
             profile.setFavoriteTeam(id: nil, abbr: nil, for: .mlb)
@@ -219,6 +273,7 @@ struct SettingsView: View {
         homeMinBF = leaderFilterDisplay(profile.homeMinBattersFaced)
         savedSnapshot = currentSnapshot
         try? modelContext.save()
+        CloudSyncTrigger.profile(modelContext: modelContext)
     }
 
     private func settingsSectionHeader(_ title: String) -> some View {
@@ -236,7 +291,16 @@ struct SettingsView: View {
         kboFavoriteID = profile.favoriteKBOTeamID ?? 0
         homeMinPA = leaderFilterDisplay(profile.homeMinPlateAppearances)
         homeMinBF = leaderFilterDisplay(profile.homeMinBattersFaced)
+        homeBatterCategory = profile.homeBatterCategory(for: activeLeague)
+        homePitcherCategory = profile.homePitcherCategory()
         savedSnapshot = currentSnapshot
+    }
+
+    private func normalizeBatterCategory() {
+        let allowed = settingsBatterCategories
+        if !allowed.contains(homeBatterCategory), let first = allowed.first {
+            homeBatterCategory = first
+        }
     }
 
     private func leaderFilterDisplay(_ value: Int) -> String {
@@ -261,6 +325,8 @@ private struct SettingsSnapshot: Equatable {
     var kboFavoriteID: Int = 0
     var homeMinPlateAppearances: Int = 0
     var homeMinBattersFaced: Int = 0
+    var homeBatterCategory: LeaderboardEngine.BatterCategory = .ops
+    var homePitcherCategory: LeaderboardEngine.PitcherCategory = .era
 }
 
 #Preview {

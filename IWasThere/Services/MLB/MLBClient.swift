@@ -26,6 +26,24 @@ actor MLBClient {
         return try await get(url)
     }
 
+    /// Locate a schedule row for hydration after cloud restore.
+    func findScheduleGame(gamePk: Int, around date: Date) async throws -> MLBScheduleGame {
+        let response = try await schedule(date: date)
+        if let match = response.dates.flatMap(\.games).first(where: { $0.gamePk == gamePk }) {
+            return match
+        }
+        // Fallback: day before / after (rare timezone edge cases).
+        if let prev = Calendar.current.date(byAdding: .day, value: -1, to: date),
+           let match = try await schedule(date: prev).dates.flatMap(\.games).first(where: { $0.gamePk == gamePk }) {
+            return match
+        }
+        if let next = Calendar.current.date(byAdding: .day, value: 1, to: date),
+           let match = try await schedule(date: next).dates.flatMap(\.games).first(where: { $0.gamePk == gamePk }) {
+            return match
+        }
+        throw MLBClientError.gameNotFound(gamePk)
+    }
+
     func standings(season: Int, leagueIDs: String = "103,104") async throws -> MLBStandingsResponse {
         var components = URLComponents(url: baseURL.appendingPathComponent("standings"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -42,6 +60,16 @@ actor MLBClient {
             throw MLBClientError.badStatus(404)
         }
         return person
+    }
+
+    func teamRoster(teamID: Int, rosterType: String = "active") async throws -> [MLBRosterEntry] {
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("teams/\(teamID)/roster"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "rosterType", value: rosterType)]
+        let response: MLBRosterResponse = try await get(components.url!)
+        return response.roster
     }
 
     /// Season / career lines from Stats API. Current season is season-to-date when asked for this year.
@@ -81,6 +109,7 @@ actor MLBClient {
 enum MLBClientError: Error {
     case badStatus(Int)
     case decode(Error)
+    case gameNotFound(Int)
 }
 
 // MARK: - DTOs (subset used by Phase 0/1)
@@ -238,6 +267,21 @@ enum MLBStatType: String {
 
 struct MLBPeopleResponse: Decodable {
     let people: [MLBPersonDetail]
+}
+
+struct MLBRosterResponse: Decodable {
+    let roster: [MLBRosterEntry]
+}
+
+struct MLBRosterEntry: Decodable {
+    let person: MLBRosterPerson
+    let jerseyNumber: String?
+    let position: MLBPosition?
+}
+
+struct MLBRosterPerson: Decodable {
+    let id: Int
+    let fullName: String
 }
 
 struct MLBPersonDetail: Decodable {

@@ -8,17 +8,20 @@ struct JerseyCardView: View {
     let valueLabel: String
     let theme: TeamTheme
     var compact: Bool = false
+    /// Tighter layout for game MVP rows on narrow phones.
+    var extraCompact: Bool = false
     /// When true, card uses a white background and stat text switches to dark.
     var lightBackground: Bool = false
 
     var body: some View {
-        HStack(spacing: compact ? 12 : 16) {
+        HStack(spacing: extraCompact ? 10 : (compact ? 12 : 16)) {
             jerseySilhouette
             VStack(alignment: .leading, spacing: 4) {
                 Text(name)
-                    .font(compact ? .subheadline.weight(.bold) : .headline.weight(.bold))
+                    .font(nameFont)
                     .foregroundStyle(DesignTokens.primaryText)
-                    .lineLimit(1)
+                    .lineLimit(compact || extraCompact ? 2 : 1)
+                    .minimumScaleFactor(0.8)
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(DesignTokens.secondaryText)
@@ -26,13 +29,13 @@ struct JerseyCardView: View {
             }
             Spacer(minLength: 8)
             Text(valueLabel)
-                .font(compact ? ScaledTypography.jerseyStatCompact : ScaledTypography.jerseyStat)
+                .font(extraCompact ? .caption.weight(.bold).monospacedDigit() : (compact ? ScaledTypography.jerseyStatCompact : ScaledTypography.jerseyStat))
                 .foregroundStyle(statColor)
                 .monospacedDigit()
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
         }
-        .padding(compact ? 12 : 16)
+        .padding(extraCompact ? 10 : (compact ? 12 : 16))
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
@@ -69,7 +72,16 @@ struct JerseyCardView: View {
                 .lineLimit(1)
                 .padding(.horizontal, 4)
         }
-        .frame(width: compact ? 52 : 64, height: compact ? 60 : 74)
+        .frame(
+            width: extraCompact ? 46 : (compact ? 52 : 64),
+            height: extraCompact ? 52 : (compact ? 60 : 74)
+        )
+    }
+
+    private var nameFont: Font {
+        if extraCompact { return .caption.weight(.bold) }
+        if compact { return .subheadline.weight(.semibold) }
+        return .headline.weight(.bold)
     }
 
     private var displayNumber: String {

@@ -394,6 +394,7 @@ struct AddGameView: View {
                             existingGameKeys: existingGameKeys
                         ) {
                             onSaved?(saved)
+                            CloudSyncTrigger.game(saved, modelContext: modelContext)
                             dismiss()
                         }
                     }
