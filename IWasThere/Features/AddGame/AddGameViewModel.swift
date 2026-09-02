@@ -13,7 +13,7 @@ final class AddGameViewModel: ObservableObject {
     @Published var selectedMLBGame: MLBScheduleGame?
     @Published var selectedKBOGame: KBOScheduleGame?
     @Published var eventTitle: String = ""
-    @Published var friendNames: [String] = []
+    @Published var friendEntries: [DiaryFriendEntry] = []
     @Published var note: String = ""
     @Published var photoItems: [PhotosPickerItem] = []
     @Published var isLoading = false
@@ -169,7 +169,7 @@ final class AddGameViewModel: ObservableObject {
             for stat in attended.playerStats {
                 stat.game = attended
             }
-            GameFriendStore.setFriends(names: friendNames, on: attended, modelContext: modelContext)
+            GameFriendStore.setFriends(entries: friendEntries, on: attended, modelContext: modelContext)
             try modelContext.save()
 
             for item in photoItems {

@@ -12,12 +12,12 @@ struct GameAttendanceFiltersBar<Prefix: View>: View {
     @Binding var gamePhaseFilter: GamePhaseFilter
     @Binding var venueFilter: String
     @Binding var favoriteResultFilter: FavoriteResultFilter
-    @Binding var friendFilter: String
+    @Binding var friendFilter: GameFriendFilterOption
 
     let seasonsInLog: [Int]
     let teamsInLog: [GameFilterTeam]
     let venuesInLog: [String]
-    let friendsInLog: [String]
+    let friendFilterOptions: [GameFriendFilterOption]
     let favoriteTeamID: Int?
     var horizontalPadding: CGFloat = 16
     @ViewBuilder var prefix: () -> Prefix
@@ -80,19 +80,24 @@ struct GameAttendanceFiltersBar<Prefix: View>: View {
                     }
                 }
 
-                if !friendsInLog.isEmpty {
+                if !friendFilterOptions.isEmpty {
                     Menu {
-                        Button("Anyone") { friendFilter = "" }
-                        ForEach(friendsInLog, id: \.self) { friend in
-                            Button(friend) { friendFilter = friend }
+                        Button("Anyone") { friendFilter = .anyone }
+                        ForEach(friendFilterOptions) { option in
+                            Button(option.chipLabel) { friendFilter = option }
                         }
                     } label: {
-                        filterChip(title: friendFilter.isEmpty ? "Anyone" : friendFilter)
+                        filterChip(
+                            title: friendFilter.isActive
+                                ? "Together: \(friendFilter.chipLabel)"
+                                : "Anyone"
+                        )
                     }
                 }
             }
             .padding(.horizontal, horizontalPadding)
         }
+        .transaction { $0.animation = nil }
     }
 
     private var teamFilterLabel: String {
@@ -122,11 +127,11 @@ extension GameAttendanceFiltersBar where Prefix == EmptyView {
         gamePhaseFilter: Binding<GamePhaseFilter>,
         venueFilter: Binding<String>,
         favoriteResultFilter: Binding<FavoriteResultFilter>,
-        friendFilter: Binding<String>,
+        friendFilter: Binding<GameFriendFilterOption>,
         seasonsInLog: [Int],
         teamsInLog: [GameFilterTeam],
         venuesInLog: [String],
-        friendsInLog: [String],
+        friendFilterOptions: [GameFriendFilterOption],
         favoriteTeamID: Int?,
         horizontalPadding: CGFloat = 16
     ) {
@@ -139,7 +144,7 @@ extension GameAttendanceFiltersBar where Prefix == EmptyView {
         self.seasonsInLog = seasonsInLog
         self.teamsInLog = teamsInLog
         self.venuesInLog = venuesInLog
-        self.friendsInLog = friendsInLog
+        self.friendFilterOptions = friendFilterOptions
         self.favoriteTeamID = favoriteTeamID
         self.horizontalPadding = horizontalPadding
         self.prefix = { EmptyView() }
@@ -162,5 +167,7 @@ struct FilterChip: View {
         .padding(.vertical, 8)
         .background(DesignTokens.surface)
         .clipShape(Capsule())
+        .fixedSize(horizontal: true, vertical: false)
+        .contentTransition(.identity)
     }
 }

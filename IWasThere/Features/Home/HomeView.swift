@@ -14,6 +14,8 @@ struct HomeView: View {
     @State private var seasonPct: String?
     @State private var seasonLoadFailed = false
     @State private var isLoadingSeason = false
+    @State private var pendingFollowCount = 0
+    @State private var showNotifications = false
 
     private var profile: UserProfile? { profiles.first }
     private var activeLeague: League { profile?.league ?? .mlb }
@@ -74,7 +76,8 @@ struct HomeView: View {
             batterCategory: homeBatterCategory,
             pitcherCategory: homePitcherCategory,
             minPlateAppearances: profile?.homeMinPlateAppearances ?? 0,
-            minBattersFaced: profile?.homeMinBattersFaced ?? 0
+            minBattersFaced: profile?.homeMinBattersFaced ?? 0,
+            playerMeta: profile?.favoritePlayerMetaByID() ?? [:]
         )
     }
 
@@ -138,12 +141,41 @@ struct HomeView: View {
             .toolbarBackground(DesignTokens.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                if AuthSession.shared.isAuthenticated {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NotificationBellButton(count: pendingFollowCount) {
+                            showNotifications = true
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showNotifications, onDismiss: {
+                Task { await refreshPendingFollowCount() }
+            }) {
+                NotificationsSheet {
+                    Task { await refreshPendingFollowCount() }
+                }
+            }
+            .task {
+                await refreshPendingFollowCount()
+            }
             .sheet(isPresented: $showingAddGame) {
                 AddGameView(league: activeLeague)
                     .environment(\.modelContext, modelContext)
             }
             .task(id: "\(activeLeague.rawValue)-\(favoriteTeamID ?? -1)") {
                 await loadSeasonRecord()
+            }
+            .task(id: profile?.favoritePlayerIDs) {
+                guard let profile else { return }
+                let changed = await profile.backfillFavoritePlayerMetaIfNeeded(
+                    mlbTeamID: profile.favoriteTeamID,
+                    kboTeamID: profile.favoriteKBOTeamID
+                )
+                if changed {
+                    try? modelContext.save()
+                }
             }
         }
     }
@@ -505,6 +537,24 @@ struct HomeView: View {
         return "\(activeLeague.title) standings"
     }
 
+    private func refreshPendingFollowCount() async {
+        guard AuthSession.shared.isAuthenticated else {
+            pendingFollowCount = 0
+            return
+        }
+        do {
+            async let follows = FollowService.shared.pendingRequestCount()
+            async let invites = GameInviteService.shared.pendingInviteCount()
+            async let leftUpdates = GameInviteService.shared.unreadGameLeftCount()
+            let followCount = try await follows
+            let inviteCount = try await invites
+            let leftCount = try await leftUpdates
+            pendingFollowCount = followCount + inviteCount + leftCount
+        } catch {
+            pendingFollowCount = 0
+        }
+    }
+
     private func loadSeasonRecord() async {
         seasonWins = nil
         seasonLosses = nil
@@ -547,6 +597,40 @@ struct HomeView: View {
             }
         } catch {
             seasonLoadFailed = true
+        }
+    }
+}
+
+private struct NotificationBellButton: View {
+    let count: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "bell.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(DesignTokens.primaryText)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .modifier(NotificationCountBadge(count: count))
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        count > 0 ? "Notifications, \(count) pending" : "Notifications"
+    }
+}
+
+private struct NotificationCountBadge: ViewModifier {
+    let count: Int
+
+    func body(content: Content) -> some View {
+        if count > 0 {
+            content.badge(count)
+        } else {
+            content
         }
     }
 }

@@ -4,6 +4,11 @@ import SwiftData
 struct FavoritePlayerStarButton: View {
     let playerID: Int
     @Bindable var profile: UserProfile
+    var playerName: String = ""
+    var jerseyNumber: String = ""
+    var teamID: Int = 0
+    var league: League = .mlb
+    var position: String = ""
     var onChange: (() -> Void)?
 
     private var isFavorite: Bool {
@@ -12,7 +17,23 @@ struct FavoritePlayerStarButton: View {
 
     var body: some View {
         Button {
-            profile.toggleFavoritePlayer(playerID)
+            if isFavorite {
+                profile.toggleFavoritePlayer(playerID)
+            } else if !playerName.isEmpty {
+                profile.toggleFavoritePlayer(
+                    playerID,
+                    meta: FavoritePlayerMeta(
+                        playerID: playerID,
+                        name: playerName,
+                        jerseyNumber: jerseyNumber,
+                        teamID: teamID,
+                        league: league,
+                        position: position
+                    )
+                )
+            } else {
+                profile.toggleFavoritePlayer(playerID)
+            }
             onChange?()
         } label: {
             Image(systemName: isFavorite ? "star.fill" : "star")

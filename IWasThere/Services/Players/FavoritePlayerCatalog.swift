@@ -55,3 +55,39 @@ enum FavoritePlayerCatalog {
             }
     }
 }
+
+extension UserProfile {
+    func backfillFavoritePlayerMetaIfNeeded(mlbTeamID: Int?, kboTeamID: Int?) async -> Bool {
+        let existingMeta = favoritePlayerMetaByID()
+        let needsWork = favoritePlayerIDs.contains { playerID in
+            guard let meta = existingMeta[playerID] else { return true }
+            return meta.position.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        guard needsWork else { return false }
+
+        let candidates = await FavoritePlayerCatalog.loadCandidates(
+            mlbTeamID: mlbTeamID,
+            kboTeamID: kboTeamID
+        )
+        let byID = Dictionary(uniqueKeysWithValues: candidates.map { ($0.playerID, $0) })
+        var changed = false
+        for playerID in favoritePlayerIDs {
+            guard let candidate = byID[playerID] else { continue }
+            let existing = existingMeta[playerID]
+            if existing == nil || existing?.position.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+                upsertFavoritePlayerMeta(
+                    FavoritePlayerMeta(
+                        playerID: candidate.playerID,
+                        name: existing?.name ?? candidate.name,
+                        jerseyNumber: existing?.jerseyNumber ?? candidate.jerseyNumber,
+                        teamID: existing?.teamID ?? candidate.teamID,
+                        league: League(rawValue: existing?.league ?? candidate.league.rawValue) ?? candidate.league,
+                        position: candidate.position
+                    )
+                )
+                changed = true
+            }
+        }
+        return changed
+    }
+}

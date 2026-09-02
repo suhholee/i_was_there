@@ -97,7 +97,15 @@ struct FavoritePlayerOnboardingSearchView: View {
                     .foregroundStyle(DesignTokens.secondaryText)
             }
             Spacer(minLength: 8)
-            FavoritePlayerStarButton(playerID: player.playerID, profile: profile)
+            FavoritePlayerStarButton(
+                playerID: player.playerID,
+                profile: profile,
+                playerName: player.name,
+                jerseyNumber: player.jerseyNumber,
+                teamID: player.teamID,
+                league: player.league,
+                position: player.position
+            )
         }
         .padding(12)
         .background(DesignTokens.surface.opacity(0.92))

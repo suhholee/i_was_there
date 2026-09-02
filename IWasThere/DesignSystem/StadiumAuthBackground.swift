@@ -31,3 +31,22 @@ struct StadiumAuthBackground: View {
 #Preview {
     StadiumAuthBackground()
 }
+
+struct SpinningBaseballView: View {
+    var fontSize: CGFloat = 28
+
+    @State private var rotation: Double = 0
+
+    var body: some View {
+        Image(systemName: "baseball.fill")
+            .font(.system(size: fontSize))
+            .foregroundStyle(DesignTokens.accent)
+            .rotationEffect(.degrees(rotation))
+            .onAppear {
+                rotation = 0
+                withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
+                    rotation = 360
+                }
+            }
+    }
+}

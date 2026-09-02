@@ -2,6 +2,8 @@ import SwiftUI
 import SwiftData
 
 struct GamesView: View {
+    @Binding var externalFriendFilter: GameFriendFilterOption?
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.teamTheme) private var teamTheme
     @Query(sort: \AttendedGame.gameDate, order: .reverse) private var allGames: [AttendedGame]
@@ -14,7 +16,8 @@ struct GamesView: View {
     @State private var gamePhaseFilter: GamePhaseFilter = .all
     @State private var venueFilter: String = ""
     @State private var favoriteResultFilter: FavoriteResultFilter = .all
-    @State private var friendFilter: String = ""
+    @State private var friendFilter: GameFriendFilterOption = .anyone
+    @State private var mutualFriends: [UserSearchResult] = []
 
     private var activeLeague: League { profiles.first?.league ?? .mlb }
     private var favoriteTeamID: Int? { profiles.first?.favoriteTeamID(for: activeLeague) }
@@ -35,8 +38,8 @@ struct GamesView: View {
         GameLogFilter.venues(in: games)
     }
 
-    private var friendsInLog: [String] {
-        GameLogFilter.friends(in: games)
+    private var friendFilterOptions: [GameFriendFilterOption] {
+        GameLogFilter.friendFilterOptions(mutualFriends: mutualFriends, games: games)
     }
 
     private var filteredGames: [AttendedGame] {
@@ -48,7 +51,7 @@ struct GamesView: View {
             venue: venueFilter.isEmpty ? nil : venueFilter,
             favoriteResult: favoriteResultFilter,
             favoriteTeamID: favoriteTeamID,
-            friend: friendFilter.isEmpty ? nil : friendFilter
+            friend: friendFilter.isActive ? friendFilter : nil
         )
     }
 
@@ -82,7 +85,7 @@ struct GamesView: View {
                             seasonsInLog: seasonsInLog,
                             teamsInLog: teamsInLog,
                             venuesInLog: venuesInLog,
-                            friendsInLog: friendsInLog,
+                            friendFilterOptions: friendFilterOptions,
                             favoriteTeamID: favoriteTeamID
                         )
                         .padding(.top, 8)
@@ -140,6 +143,14 @@ struct GamesView: View {
             .onChange(of: activeLeague) { _, _ in
                 resetFilters()
             }
+            .task(id: AuthSession.shared.isAuthenticated) {
+                await loadMutualFriends()
+            }
+            .onChange(of: externalFriendFilter) { _, newValue in
+                guard let newValue else { return }
+                friendFilter = newValue
+                externalFriendFilter = nil
+            }
             .task(id: games.map(\.mlbGamePk)) {
                 try? await Task.sleep(for: .milliseconds(300))
                 for game in games {
@@ -156,7 +167,20 @@ struct GamesView: View {
         gamePhaseFilter = .all
         venueFilter = ""
         favoriteResultFilter = .all
-        friendFilter = ""
+        friendFilter = .anyone
+    }
+
+    @MainActor
+    private func loadMutualFriends() async {
+        guard AuthSession.shared.isAuthenticated else {
+            mutualFriends = []
+            return
+        }
+        do {
+            mutualFriends = try await FollowService.shared.listMutualFollows()
+        } catch {
+            mutualFriends = []
+        }
     }
 
     private func gameCard(_ game: AttendedGame) -> some View {
@@ -169,7 +193,7 @@ struct GamesView: View {
                 Spacer(minLength: 8)
                 FavoriteResultBadge(won: game.favoriteTeamWon(favoriteTeamID: favoriteTeamID))
             }
-            Text("\(game.awayScore)–\(game.homeScore) · \(game.localDateTimeLabel)")
+            Text("\(game.awayScore)–\(game.homeScore) · \(game.gameCardDateLabel)")
                 .font(.subheadline)
                 .foregroundStyle(DesignTokens.cardSecondaryText)
                 .monospacedDigit()
@@ -218,6 +242,6 @@ struct GamesView: View {
 }
 
 #Preview {
-    GamesView()
+    GamesView(externalFriendFilter: .constant(nil))
         .modelContainer(for: [UserProfile.self, AttendedGame.self, GamePlayerStat.self, GamePhoto.self, GameFriend.self], inMemory: true)
 }

@@ -7,6 +7,7 @@ struct RootTabView: View {
     @Query private var allGames: [AttendedGame]
     @State private var selectedTab: AppTab = .home
     @State private var tabBeforeSettings: AppTab = .home
+    @State private var pendingGamesFriendFilter: GameFriendFilterOption?
     @State private var settingsHasUnsavedChanges = false
     @State private var settingsSaveTrigger = false
     @State private var showSettingsLeaveAlert = false
@@ -21,20 +22,24 @@ struct RootTabView: View {
 
     var body: some View {
         TabView(selection: tabSelection) {
-            GamesView()
-                .id(activeLeague)
-                .tabItem { Label("Games", systemImage: "baseball") }
-                .tag(AppTab.games)
-
             HomeView(selectedTab: $selectedTab)
                 .id(activeLeague)
                 .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(AppTab.home)
 
+            GamesView(externalFriendFilter: $pendingGamesFriendFilter)
+                .id(activeLeague)
+                .tabItem { Label("Games", systemImage: "baseball") }
+                .tag(AppTab.games)
+
             LeadersView()
                 .id(activeLeague)
                 .tabItem { Label("Leaders", systemImage: "trophy.fill") }
                 .tag(AppTab.leaders)
+
+            PeopleView()
+                .tabItem { Label("People", systemImage: "person.2.fill") }
+                .tag(AppTab.people)
 
             SettingsView(
                 hasUnsavedChanges: $settingsHasUnsavedChanges,
@@ -46,6 +51,7 @@ struct RootTabView: View {
             .tag(AppTab.settings)
         }
         .environment(\.teamTheme, teamTheme)
+        .environment(\.openGamesTogether, { friend in openGamesTogether(with: friend) })
         .tint(DesignTokens.primaryText)
         .preferredColorScheme(.dark)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -112,12 +118,29 @@ struct RootTabView: View {
             try? modelContext.save()
         }
     }
+
+    private func openGamesTogether(with friend: UserSearchResult) {
+        pendingGamesFriendFilter = GameFriendFilterOption(friend: friend)
+        selectedTab = .games
+    }
+}
+
+private struct OpenGamesTogetherKey: EnvironmentKey {
+    static let defaultValue: ((UserSearchResult) -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var openGamesTogether: ((UserSearchResult) -> Void)? {
+        get { self[OpenGamesTogetherKey.self] }
+        set { self[OpenGamesTogetherKey.self] = newValue }
+    }
 }
 
 enum AppTab: Hashable {
     case games
     case home
     case leaders
+    case people
     case settings
 }
 
