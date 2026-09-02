@@ -8,12 +8,19 @@ struct GameDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var profiles: [UserProfile]
     @Bindable var game: AttendedGame
+    var isReadOnly: Bool = false
+    var favoriteTeamIDOverride: Int? = nil
 
     @State private var detailTab: DetailTab = .diary
     @State private var isEditingDiary = false
     @State private var draftEventTitle = ""
-    @State private var draftFriendNames: [String] = []
+    @State private var draftFriendEntries: [DiaryFriendEntry] = []
+    @State private var lockedFriendEntries: [DiaryFriendEntry] = []
     @State private var draftNote = ""
+
+    private var canRemoveFriends: Bool {
+        !game.isSharedGameCopy
+    }
 
     @State private var lineSegment: LineSegment = .batters
     @State private var batterSort: BatterSortKey = .ops
@@ -22,8 +29,40 @@ struct GameDetailView: View {
     @State private var sortAscending = false
     @State private var newPhotoItems: [PhotosPickerItem] = []
     @State private var enlargedPhotoPath: String?
+    @State private var showInviteFriendSheet = false
+    @State private var showLeaveGameConfirm = false
+    @State private var showDeleteGameConfirm = false
+    @State private var showDeleteError = false
+    @State private var deleteErrorMessage: String?
+    @State private var showUnsavedDiaryAlert = false
+    @State private var isDeletingGame = false
+
+    private var isSharedGameCopy: Bool {
+        game.isSharedGameCopy
+    }
+
+    private var hasUnsavedDiaryEdits: Bool {
+        guard isEditingDiary else { return false }
+        if draftEventTitle.trimmingCharacters(in: .whitespacesAndNewlines) != game.eventTitle {
+            return true
+        }
+        if draftNote.trimmingCharacters(in: .whitespacesAndNewlines) != game.note {
+            return true
+        }
+        let baseline = GameFriendStore.entries(from: game)
+        let effectiveDraft = canRemoveFriends
+            ? draftFriendEntries
+            : GameFriendStore.entriesAllowingAdditionsOnly(
+                baseline: lockedFriendEntries,
+                draft: draftFriendEntries
+            )
+        return !GameFriendStore.entriesAreEquivalent(baseline, effectiveDraft)
+    }
 
     private var favoriteTeamID: Int? {
+        if let favoriteTeamIDOverride {
+            return favoriteTeamIDOverride
+        }
         let league = game.resolvedLeague
         return profiles.first?.favoriteTeamID(for: league)
     }
@@ -95,20 +134,79 @@ struct GameDetailView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button("Delete game", role: .destructive) {
-                        for photo in game.photos {
-                            PhotoStore.delete(relativePath: photo.relativePath)
+            if !isReadOnly {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        if AuthSession.shared.isAuthenticated {
+                            Button("Add friend") {
+                                showInviteFriendSheet = true
+                            }
                         }
-                        modelContext.delete(game)
-                        try? modelContext.save()
-                        dismiss()
+                        if isSharedGameCopy {
+                            Button("Leave game", role: .destructive) {
+                                showLeaveGameConfirm = true
+                            }
+                        } else {
+                            Button("Delete game", role: .destructive) {
+                                showDeleteGameConfirm = true
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
                 }
             }
+        }
+        .sheet(isPresented: $showInviteFriendSheet) {
+            InviteFriendSheet(game: game)
+                .environment(\.modelContext, modelContext)
+        }
+        .navigationBarBackButtonHidden(isEditingDiary && hasUnsavedDiaryEdits)
+        .toolbar {
+            if isEditingDiary && hasUnsavedDiaryEdits {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showUnsavedDiaryAlert = true
+                    } label: {
+                        Image(systemName: "chevron.backward")
+                            .fontWeight(.semibold)
+                    }
+                }
+            }
+        }
+        .alert("Save diary changes?", isPresented: $showUnsavedDiaryAlert) {
+            Button("Save") {
+                saveDiaryEdit()
+                dismiss()
+            }
+            Button("Discard Changes", role: .destructive) {
+                cancelDiaryEdit()
+                dismiss()
+            }
+            Button("Keep Editing", role: .cancel) {}
+        } message: {
+            Text("You have unsaved changes to this game's diary.")
+        }
+        .alert("Leave this game?", isPresented: $showLeaveGameConfirm) {
+            Button("Leave Game", role: .destructive) {
+                Task { await deleteGame() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You'll be removed from this game and the person who invited you won't see you on their friend list anymore.")
+        }
+        .alert("Delete this game?", isPresented: $showDeleteGameConfirm) {
+            Button("Delete Game", role: .destructive) {
+                Task { await deleteGame() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently removes the game from your diary and from friends who joined through your invite.")
+        }
+        .alert("Couldn't remove game", isPresented: $showDeleteError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deleteErrorMessage ?? "Try again in a moment.")
         }
         .onChange(of: lineSegment) { _, _ in
             sortAscending = false
@@ -120,6 +218,14 @@ struct GameDetailView: View {
         }
         .task {
             await StarterBackfill.ensureStarters(for: game, modelContext: modelContext)
+            if game.isSharedGameCopy,
+               await GameFriendStore.normalizeSharedCopyFriendsIfNeeded(
+                   on: game,
+                   modelContext: modelContext
+               ) {
+                try? modelContext.save()
+                CloudSyncTrigger.game(game, modelContext: modelContext)
+            }
         }
         .fullScreenCover(isPresented: Binding(
             get: { enlargedPhotoPath != nil },
@@ -242,23 +348,28 @@ struct GameDetailView: View {
                     .font(.headline)
                     .foregroundStyle(DesignTokens.primaryText)
                 Spacer()
-                if isEditingDiary {
-                    Button("Cancel") { cancelDiaryEdit() }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(DesignTokens.secondaryText)
-                    Button("Done") { saveDiaryEdit() }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(DesignTokens.accent)
-                } else {
-                    Button("Edit") { beginDiaryEdit() }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(DesignTokens.accent)
+                if !isReadOnly {
+                    if isEditingDiary {
+                        Button("Cancel") { cancelDiaryEdit() }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(DesignTokens.secondaryText)
+                        Button("Done") { saveDiaryEdit() }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(DesignTokens.accent)
+                    } else {
+                        Button("Edit") { beginDiaryEdit() }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(DesignTokens.accent)
+                    }
                 }
             }
 
-            if isEditingDiary {
+            if isEditingDiary && !isReadOnly {
                 diaryEditor(title: "Event/Giveaway", text: $draftEventTitle)
-                FriendEditorView(friendNames: $draftFriendNames)
+                FriendEditorView(
+                    friends: $draftFriendEntries,
+                    canRemoveFriends: canRemoveFriends
+                )
                 diaryEditor(title: "Notes", text: $draftNote)
                 photoSection(editing: true)
             } else {
@@ -355,23 +466,65 @@ struct GameDetailView: View {
 
     private func beginDiaryEdit() {
         draftEventTitle = game.eventTitle
-        draftFriendNames = game.friendNames
+        draftFriendEntries = GameFriendStore.entries(from: game)
+        lockedFriendEntries = canRemoveFriends ? [] : draftFriendEntries
         draftNote = game.note
         isEditingDiary = true
     }
 
     private func cancelDiaryEdit() {
         isEditingDiary = false
+        lockedFriendEntries = []
         newPhotoItems = []
     }
 
     private func saveDiaryEdit() {
+        let previousLinked = Set(game.friends.compactMap(\.resolvedLinkedUserId))
         game.eventTitle = draftEventTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        GameFriendStore.setFriends(names: draftFriendNames, on: game, modelContext: modelContext)
+        let friendEntries = canRemoveFriends
+            ? draftFriendEntries
+            : GameFriendStore.entriesAllowingAdditionsOnly(
+                baseline: lockedFriendEntries,
+                draft: draftFriendEntries
+            )
+        GameFriendStore.setFriends(entries: friendEntries, on: game, modelContext: modelContext)
         game.note = draftNote.trimmingCharacters(in: .whitespacesAndNewlines)
         try? modelContext.save()
         isEditingDiary = false
+        lockedFriendEntries = []
         CloudSyncTrigger.game(game, modelContext: modelContext)
+        Task {
+            try? await GameInviteService.shared.sendInvitesForNewLinkedFriends(
+                on: game,
+                previousLinkedUserIds: previousLinked,
+                modelContext: modelContext
+            )
+        }
+    }
+
+    @MainActor
+    private func deleteGame() async {
+        guard !isDeletingGame else { return }
+        isDeletingGame = true
+        defer { isDeletingGame = false }
+
+        if AuthSession.shared.isAuthenticated {
+            do {
+                try await CloudSyncService.shared.deleteGame(game, modelContext: modelContext)
+            } catch {
+                deleteErrorMessage = error.localizedDescription
+                showDeleteError = true
+                return
+            }
+        }
+
+        let photos = game.photos
+        for photo in photos {
+            PhotoStore.delete(relativePath: photo.relativePath)
+        }
+        modelContext.delete(game)
+        try? modelContext.save()
+        dismiss()
     }
 
     private func importPhotos(_ items: [PhotosPickerItem]) async {

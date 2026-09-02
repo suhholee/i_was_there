@@ -3,35 +3,31 @@ import SwiftData
 
 @main
 struct IWasThereApp: App {
-    @State private var container: ModelContainer?
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    private let container: ModelContainer
 
     init() {
         AppAppearance.configureNavigationBar()
         AppAppearance.configureTabBar()
+        AppAppearance.configureWindow()
+        container = Self.makeContainer()
     }
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if let container {
-                    AppRootView()
-                        .modelContainer(container)
-                } else {
-                    LaunchLoadingView()
+            AppRootView()
+                .modelContainer(container)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(DesignTokens.background.ignoresSafeArea())
+                .preferredColorScheme(.dark)
+                .onOpenURL { url in
+                    Task { await AuthSession.shared.handleIncomingURL(url) }
                 }
-            }
-            .task {
-                guard container == nil else { return }
-                container = Self.makeContainer()
-            }
-            .onOpenURL { url in
-                Task { await AuthSession.shared.handleIncomingURL(url) }
-            }
         }
     }
 
     /// Bump when the SwiftData schema changes incompatibly (e.g. adding `GameFriend`).
-    private static let storeSchemaVersion = 4
+    private static let storeSchemaVersion = 8
     private static let schemaVersionKey = "IWasThereStoreSchemaVersion"
 
     private static func makeContainer() -> ModelContainer {
@@ -123,16 +119,5 @@ struct IWasThereApp: App {
                 }
             }
         }
-    }
-}
-
-private struct LaunchLoadingView: View {
-    var body: some View {
-        ZStack {
-            DesignTokens.background.ignoresSafeArea()
-            ProgressView()
-                .tint(.white)
-        }
-        .preferredColorScheme(.dark)
     }
 }

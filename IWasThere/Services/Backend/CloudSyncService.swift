@@ -11,6 +11,7 @@ final class CloudSyncService {
     private(set) var isSyncing = false
     private(set) var lastSyncError: String?
     private let photoBucket = "game-photos"
+    private let avatarBucket = "avatars"
 
     private init() {}
 
@@ -50,6 +51,38 @@ final class CloudSyncService {
         }
     }
 
+    func syncGameAndWait(
+        _ game: AttendedGame,
+        modelContext: ModelContext,
+        userId: UUID
+    ) async throws {
+        guard let client = SupabaseManager.client else { return }
+        try await pushGame(client: client, game: game, userId: userId, modelContext: modelContext)
+    }
+
+    func cloudGameID(for game: AttendedGame, userId: UUID) async throws -> UUID? {
+        guard let client = SupabaseManager.client else { return nil }
+        game.ensureGameKey()
+        return try await fetchCloudGame(
+            client: client,
+            userId: userId,
+            gameKey: game.gameKey
+        )?.id
+    }
+
+    func pull(modelContext: ModelContext, userId: UUID) async {
+        guard let client = SupabaseManager.client else { return }
+        try? await pullAndHydrate(client: client, modelContext: modelContext, userId: userId)
+    }
+
+    func deleteGame(_ game: AttendedGame, modelContext: ModelContext) async throws {
+        guard let client = SupabaseManager.client else { return }
+        game.ensureGameKey()
+        try await client
+            .rpc("delete_attended_game", params: ["p_game_key": game.gameKey])
+            .execute()
+    }
+
     // MARK: - Push
 
     private func pushProfile(
@@ -59,6 +92,12 @@ final class CloudSyncService {
     ) async throws {
         let descriptor = FetchDescriptor<UserProfile>()
         guard let profile = try modelContext.fetch(descriptor).first else { return }
+        try await pushAvatarIfNeeded(
+            client: client,
+            profile: profile,
+            userId: userId,
+            modelContext: modelContext
+        )
         let row = CloudProfileUpsert.from(profile: profile, userId: userId)
         try await client
             .from("profiles")
@@ -102,8 +141,13 @@ final class CloudSyncService {
             .eq("game_id", value: cloudRow.id.uuidString)
             .execute()
 
-        let friendRows = game.friendNames.map {
-            CloudGameFriendInsert(userId: userId, gameId: cloudRow.id, name: $0)
+        let friendRows = game.friends.map {
+            CloudGameFriendInsert(
+                userId: userId,
+                gameId: cloudRow.id,
+                name: $0.name,
+                linkedUserId: $0.resolvedLinkedUserId
+            )
         }
         if !friendRows.isEmpty {
             try await client.from("game_friends").insert(friendRows).execute()
@@ -139,10 +183,12 @@ final class CloudSyncService {
             let descriptor = FetchDescriptor<UserProfile>()
             if let local = try modelContext.fetch(descriptor).first {
                 cloudProfile.apply(to: local)
+                try await downloadAvatarIfNeeded(client: client, profile: local, modelContext: modelContext)
             } else {
                 let profile = UserProfile()
                 cloudProfile.apply(to: profile)
                 modelContext.insert(profile)
+                try await downloadAvatarIfNeeded(client: client, profile: profile, modelContext: modelContext)
             }
         }
 
@@ -162,6 +208,30 @@ final class CloudSyncService {
                 if let local = localGames.first(where: { $0.gameKey == row.gameKey }) {
                     local.eventTitle = row.eventTitle
                     local.note = row.note
+                    if let invitedFrom = row.invitedFromUserId {
+                        local.invitedFromUserId = invitedFrom.uuidString
+                    }
+
+                    let friends: [CloudGameFriendRow] = try await client
+                        .from("game_friends")
+                        .select()
+                        .eq("game_id", value: row.id.uuidString)
+                        .execute()
+                        .value
+
+                    GameFriendStore.setFriends(
+                        entries: friends.map {
+                            DiaryFriendEntry(name: $0.name, linkedUserId: $0.linkedUserId)
+                        },
+                        on: local,
+                        modelContext: modelContext
+                    )
+                    if local.isSharedGameCopy {
+                        await GameFriendStore.normalizeSharedCopyFriendsIfNeeded(
+                            on: local,
+                            modelContext: modelContext
+                        )
+                    }
                 }
                 continue
             }
@@ -175,10 +245,18 @@ final class CloudSyncService {
 
             let hydrated = try await GameHydrationService.hydrate(
                 row: row,
-                friendNames: friends.map(\.name),
+                friends: friends.map {
+                    DiaryFriendEntry(name: $0.name, linkedUserId: $0.linkedUserId)
+                },
                 modelContext: modelContext,
                 existingGameKeys: localKeys
             )
+            if hydrated.isSharedGameCopy {
+                await GameFriendStore.normalizeSharedCopyFriendsIfNeeded(
+                    on: hydrated,
+                    modelContext: modelContext
+                )
+            }
             localKeys.insert(row.gameKey)
 
             let photos: [CloudGamePhotoRow] = try await client
@@ -198,6 +276,56 @@ final class CloudSyncService {
             }
         }
 
+        let cloudKeys = Set(cloudGames.map(\.gameKey))
+        for local in localGames where !cloudKeys.contains(local.gameKey) {
+            for photo in local.photos {
+                PhotoStore.delete(relativePath: photo.relativePath)
+            }
+            modelContext.delete(local)
+        }
+
+        try? modelContext.save()
+    }
+
+    // MARK: - Avatar
+
+    private func pushAvatarIfNeeded(
+        client: SupabaseClient,
+        profile: UserProfile,
+        userId: UUID,
+        modelContext: ModelContext
+    ) async throws {
+        guard !profile.avatarRelativePath.isEmpty else { return }
+
+        let localURL = AvatarStore.absoluteURL(relativePath: profile.avatarRelativePath)
+        guard let data = try? Data(contentsOf: localURL) else { return }
+
+        let path = AvatarStore.cloudPath(for: userId)
+        try await client.storage
+            .from(avatarBucket)
+            .upload(path, data: data, options: FileOptions(contentType: "image/jpeg", upsert: true))
+
+        profile.avatarStoragePath = path
+        SocialProfileService.shared.invalidateAvatarCache(for: path)
+        try? modelContext.save()
+    }
+
+    private func downloadAvatarIfNeeded(
+        client: SupabaseClient,
+        profile: UserProfile,
+        modelContext: ModelContext
+    ) async throws {
+        guard !profile.avatarStoragePath.isEmpty else { return }
+
+        let data = try await client.storage
+            .from(avatarBucket)
+            .download(path: profile.avatarStoragePath)
+
+        guard let image = UIImage(data: data),
+              let jpeg = PhotoStore.jpegData(from: image)
+        else { return }
+
+        profile.avatarRelativePath = try AvatarStore.saveJPEG(jpeg)
         try? modelContext.save()
     }
 

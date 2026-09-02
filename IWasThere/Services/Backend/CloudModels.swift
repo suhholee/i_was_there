@@ -5,12 +5,16 @@ import Foundation
 struct CloudProfileRow: Codable, Sendable {
     let userId: UUID
     var displayName: String
+    var username: String?
+    var avatarStoragePath: String?
+    var profileVisibility: String?
     var favoriteTeamId: Int?
     var favoriteTeamAbbr: String?
     var favoriteKboTeamId: Int?
     var favoriteKboTeamAbbr: String?
     var activeLeague: String
     var favoritePlayerIds: [Int]
+    var favoritePlayerMetaJSON: String?
     var homeMinPlateAppearances: Int
     var homeMinBattersFaced: Int
     var homeBatterStat: String?
@@ -20,12 +24,16 @@ struct CloudProfileRow: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case displayName = "display_name"
+        case username
+        case avatarStoragePath = "avatar_storage_path"
+        case profileVisibility = "profile_visibility"
         case favoriteTeamId = "favorite_team_id"
         case favoriteTeamAbbr = "favorite_team_abbr"
         case favoriteKboTeamId = "favorite_kbo_team_id"
         case favoriteKboTeamAbbr = "favorite_kbo_team_abbr"
         case activeLeague = "active_league"
         case favoritePlayerIds = "favorite_player_ids"
+        case favoritePlayerMetaJSON = "favorite_player_meta_json"
         case homeMinPlateAppearances = "home_min_plate_appearances"
         case homeMinBattersFaced = "home_min_batters_faced"
         case homeBatterStat = "home_batter_stat"
@@ -47,6 +55,9 @@ struct CloudAttendedGameRow: Codable, Sendable, Identifiable {
     let season: Int
     var eventTitle: String
     var note: String
+    let awayTeamName: String?
+    let homeTeamName: String?
+    let invitedFromUserId: UUID?
     let createdAt: Date?
     var updatedAt: Date?
 
@@ -63,6 +74,9 @@ struct CloudAttendedGameRow: Codable, Sendable, Identifiable {
         case season
         case eventTitle = "event_title"
         case note
+        case awayTeamName = "away_team_name"
+        case homeTeamName = "home_team_name"
+        case invitedFromUserId = "invited_from_user_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -105,12 +119,16 @@ struct CloudGamePhotoRow: Codable, Sendable, Identifiable {
 struct CloudProfileUpsert: Codable, Sendable {
     let userId: UUID
     var displayName: String
+    var username: String?
+    var avatarStoragePath: String?
+    var profileVisibility: String
     var favoriteTeamId: Int?
     var favoriteTeamAbbr: String?
     var favoriteKboTeamId: Int?
     var favoriteKboTeamAbbr: String?
     var activeLeague: String
     var favoritePlayerIds: [Int]
+    var favoritePlayerMetaJSON: String?
     var homeMinPlateAppearances: Int
     var homeMinBattersFaced: Int
     var homeBatterStat: String
@@ -120,12 +138,16 @@ struct CloudProfileUpsert: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case displayName = "display_name"
+        case username
+        case avatarStoragePath = "avatar_storage_path"
+        case profileVisibility = "profile_visibility"
         case favoriteTeamId = "favorite_team_id"
         case favoriteTeamAbbr = "favorite_team_abbr"
         case favoriteKboTeamId = "favorite_kbo_team_id"
         case favoriteKboTeamAbbr = "favorite_kbo_team_abbr"
         case activeLeague = "active_league"
         case favoritePlayerIds = "favorite_player_ids"
+        case favoritePlayerMetaJSON = "favorite_player_meta_json"
         case homeMinPlateAppearances = "home_min_plate_appearances"
         case homeMinBattersFaced = "home_min_batters_faced"
         case homeBatterStat = "home_batter_stat"
@@ -146,6 +168,8 @@ struct CloudAttendedGameUpsert: Codable, Sendable {
     let season: Int
     var eventTitle: String
     var note: String
+    var awayTeamName: String
+    var homeTeamName: String
     var updatedAt: String
 
     enum CodingKeys: String, CodingKey {
@@ -160,6 +184,8 @@ struct CloudAttendedGameUpsert: Codable, Sendable {
         case season
         case eventTitle = "event_title"
         case note
+        case awayTeamName = "away_team_name"
+        case homeTeamName = "home_team_name"
         case updatedAt = "updated_at"
     }
 }
@@ -168,6 +194,14 @@ struct CloudGameFriendInsert: Codable, Sendable {
     let userId: UUID
     let gameId: UUID
     let name: String
+    let linkedUserId: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case gameId = "game_id"
+        case name
+        case linkedUserId = "linked_user_id"
+    }
 }
 
 struct CloudGamePhotoInsert: Codable, Sendable {
@@ -191,12 +225,23 @@ enum CloudDateCodec {
 extension CloudProfileRow {
     func apply(to profile: UserProfile) {
         profile.displayName = displayName
+        if let username, !username.isEmpty {
+            profile.setUsername(username)
+        }
+        if let avatarStoragePath {
+            profile.avatarStoragePath = avatarStoragePath
+        }
+        profile.profileVisibility = profileVisibility
+            ?? ProfileVisibility.public.rawValue
         profile.favoriteTeamID = favoriteTeamId
         profile.favoriteTeamAbbr = favoriteTeamAbbr
         profile.favoriteKBOTeamID = favoriteKboTeamId
         profile.favoriteKBOTeamAbbr = favoriteKboTeamAbbr
         profile.activeLeague = activeLeague
         profile.favoritePlayerIDs = favoritePlayerIds
+        if let favoritePlayerMetaJSON, !favoritePlayerMetaJSON.isEmpty {
+            profile.favoritePlayerMetaJSON = favoritePlayerMetaJSON
+        }
         profile.homeMinPlateAppearances = homeMinPlateAppearances
         profile.homeMinBattersFaced = homeMinBattersFaced
         profile.homeBatterStat = homeBatterStat
@@ -211,12 +256,18 @@ extension CloudProfileUpsert {
         CloudProfileUpsert(
             userId: userId,
             displayName: profile.displayName,
+            username: profile.username.isEmpty ? nil : profile.username,
+            avatarStoragePath: profile.avatarStoragePath.isEmpty ? nil : profile.avatarStoragePath,
+            profileVisibility: profile.profileVisibility,
             favoriteTeamId: profile.favoriteTeamID,
             favoriteTeamAbbr: profile.favoriteTeamAbbr,
             favoriteKboTeamId: profile.favoriteKBOTeamID,
             favoriteKboTeamAbbr: profile.favoriteKBOTeamAbbr,
             activeLeague: profile.activeLeague,
             favoritePlayerIds: profile.favoritePlayerIDs,
+            favoritePlayerMetaJSON: profile.favoritePlayerMetaJSON == "[]"
+                ? nil
+                : profile.favoritePlayerMetaJSON,
             homeMinPlateAppearances: profile.homeMinPlateAppearances,
             homeMinBattersFaced: profile.homeMinBattersFaced,
             homeBatterStat: profile.homeBatterStat,
@@ -246,6 +297,8 @@ extension CloudAttendedGameUpsert {
             season: game.season,
             eventTitle: game.eventTitle,
             note: game.note,
+            awayTeamName: game.awayTeamName,
+            homeTeamName: game.homeTeamName,
             updatedAt: CloudDateCodec.string(from: .now)
         )
     }

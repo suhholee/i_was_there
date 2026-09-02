@@ -14,7 +14,8 @@ struct LeadersView: View {
     @State private var gamePhaseFilter: GamePhaseFilter = .all
     @State private var venueFilter: String = ""
     @State private var favoriteResultFilter: FavoriteResultFilter = .all
-    @State private var friendFilter: String = ""
+    @State private var friendFilter: GameFriendFilterOption = .anyone
+    @State private var mutualFriends: [UserSearchResult] = []
     @State private var batterPosition: LeaderboardEngine.BatterPositionFilter = .all
     @State private var pitcherRole: LeaderboardEngine.PitcherRoleFilter = .all
     @State private var allLeaderRows: [LeaderboardEngine.PlayerAggregate] = []
@@ -71,8 +72,8 @@ struct LeadersView: View {
         GameLogFilter.venues(in: games)
     }
 
-    private var friendsInLog: [String] {
-        GameLogFilter.friends(in: games)
+    private var friendFilterOptions: [GameFriendFilterOption] {
+        GameLogFilter.friendFilterOptions(mutualFriends: mutualFriends, games: games)
     }
 
     private var filteredGames: [AttendedGame] {
@@ -84,18 +85,12 @@ struct LeadersView: View {
             venue: venueFilter.isEmpty ? nil : venueFilter,
             favoriteResult: favoriteResultFilter,
             favoriteTeamID: favoriteTeamID,
-            friend: friendFilter.isEmpty ? nil : friendFilter
+            friend: friendFilter.isActive ? friendFilter : nil
         )
     }
 
     private var batterCategories: [LeaderboardEngine.BatterCategory] {
-        switch activeLeague {
-        case .mlb:
-            return Array(LeaderboardEngine.BatterCategory.allCases)
-        case .kbo:
-            // BoxScore lines omit HR/OPS inputs for now.
-            return [.avg, .hits, .runs, .rbi, .mvp]
-        }
+        LeaderboardEngine.batterCategories(for: activeLeague)
     }
 
     var body: some View {
@@ -193,7 +188,13 @@ struct LeadersView: View {
                 normalizeBatterCategory()
             }
             .onChange(of: refreshTrigger) { _, _ in
-                refreshRows(invalidateMVP: true)
+                Task {
+                    await Task.yield()
+                    refreshRows(invalidateMVP: true)
+                }
+            }
+            .task(id: AuthSession.shared.isAuthenticated) {
+                await loadMutualFriends()
             }
         }
     }
@@ -254,7 +255,7 @@ struct LeadersView: View {
             seasonsInLog: seasonsInLog,
             teamsInLog: teamsInLog,
             venuesInLog: venuesInLog,
-            friendsInLog: friendsInLog,
+            friendFilterOptions: friendFilterOptions,
             favoriteTeamID: favoriteTeamID,
             horizontalPadding: 16
         ) {
@@ -379,11 +380,25 @@ struct LeadersView: View {
         gamePhaseFilter = .all
         venueFilter = ""
         favoriteResultFilter = .all
-        friendFilter = ""
+        friendFilter = .anyone
+    }
+
+    @MainActor
+    private func loadMutualFriends() async {
+        guard AuthSession.shared.isAuthenticated else {
+            mutualFriends = []
+            return
+        }
+        do {
+            mutualFriends = try await FollowService.shared.listMutualFollows()
+        } catch {
+            mutualFriends = []
+        }
     }
 
     private func refreshRows(invalidateMVP: Bool = false) {
         let pitchers = segment == .pitchers
+        let selectedTeamID = teamFilter == 0 ? nil : teamFilter
         let key = "\(activeLeague.rawValue)-\(filteredGames.map(\.mlbGamePk))"
         if invalidateMVP || key != mvpCacheKey {
             cachedMVPCounts = LeaderboardEngine.mvpCounts(
@@ -401,7 +416,7 @@ struct LeadersView: View {
                 from: filteredGames,
                 category: batterCategory,
                 season: nil,
-                teamID: nil,
+                teamID: selectedTeamID,
                 position: batterPosition,
                 limit: 1_000,
                 minPlateAppearances: minPlateAppearances,
@@ -412,7 +427,7 @@ struct LeadersView: View {
                 from: filteredGames,
                 category: pitcherCategory,
                 season: nil,
-                teamID: nil,
+                teamID: selectedTeamID,
                 role: pitcherRole,
                 limit: 1_000,
                 minBattersFaced: minBattersFaced,
@@ -431,7 +446,7 @@ struct LeadersView: View {
             from: filteredGames,
             pitchersOnly: segment == .pitchers,
             season: nil,
-            teamID: nil,
+            teamID: selectedTeamID,
             minPlateAppearances: minPlateAppearances,
             minBattersFaced: minBattersFaced
         )
@@ -461,7 +476,7 @@ private struct LeadersRefreshTrigger: Equatable {
     let gamePhaseFilter: GamePhaseFilter
     let venueFilter: String
     let favoriteResultFilter: FavoriteResultFilter
-    let friendFilter: String
+    let friendFilter: GameFriendFilterOption
     let batterPosition: LeaderboardEngine.BatterPositionFilter
     let pitcherRole: LeaderboardEngine.PitcherRoleFilter
     let minPlateAppearances: Int

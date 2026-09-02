@@ -87,6 +87,7 @@ enum KBOBoxscoreImporter {
             stat.atBats += ab
             stat.plateAppearances += ab > 0 ? ab : 1
             stat.hits += hits
+            stat.homeRuns += row.derivedHomeRuns
             stat.rbi += rbi
             stat.runs += runs
             if !stat.position.isEmpty || !(row.pos_if ?? "").isEmpty {

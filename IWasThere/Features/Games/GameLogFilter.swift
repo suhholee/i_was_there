@@ -1,5 +1,82 @@
 import Foundation
 
+struct GameFriendFilterOption: Identifiable, Hashable, Sendable {
+    let id: String
+    let chipLabel: String
+    let linkedUserId: UUID?
+    let matchName: String?
+
+    static let anyone = GameFriendFilterOption(
+        id: "anyone",
+        chipLabel: "Anyone",
+        linkedUserId: nil,
+        matchName: nil
+    )
+
+    var isActive: Bool {
+        self != .anyone
+    }
+
+    init(id: String, chipLabel: String, linkedUserId: UUID?, matchName: String?) {
+        self.id = id
+        self.chipLabel = chipLabel
+        self.linkedUserId = linkedUserId
+        self.matchName = matchName
+    }
+
+    init(friend: UserSearchResult) {
+        let displayName = friend.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.init(
+            id: friend.userId.uuidString,
+            chipLabel: friend.usernameTag,
+            linkedUserId: friend.userId,
+            matchName: displayName.isEmpty ? friend.username : displayName
+        )
+    }
+}
+
+struct RankedMutualFriend: Identifiable, Sendable {
+    let friend: UserSearchResult
+    let gamesTogether: Int
+    let togetherAttendance: LeaderboardEngine.AttendanceRecord
+
+    var id: UUID { friend.userId }
+}
+
+enum FriendListRankMode: String, CaseIterable, Identifiable {
+    case gamesTogether
+    case winRate
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .gamesTogether: "Most games"
+        case .winRate: "Win rate"
+        }
+    }
+}
+
+enum FriendRankMedal: Int {
+    case gold = 1
+    case silver = 2
+    case bronze = 3
+
+    var systemImage: String { "medal.fill" }
+
+    var color: (red: Double, green: Double, blue: Double) {
+        switch self {
+        case .gold: (1.0, 0.78, 0.0)
+        case .silver: (0.78, 0.8, 0.84)
+        case .bronze: (0.8, 0.5, 0.2)
+        }
+    }
+
+    static func forRank(_ rank: Int) -> FriendRankMedal? {
+        FriendRankMedal(rawValue: rank)
+    }
+}
+
 enum GamePhaseFilter: String, CaseIterable, Identifiable {
     case all
     case regularSeason
@@ -41,7 +118,7 @@ enum GameLogFilter {
         venue: String?,
         favoriteResult: FavoriteResultFilter,
         favoriteTeamID: Int?,
-        friend: String?
+        friend: GameFriendFilterOption?
     ) -> [AttendedGame] {
         games.filter { game in
             if let season, game.season != season { return false }
@@ -51,7 +128,7 @@ enum GameLogFilter {
             if !matchesFavoriteResult(game, filter: favoriteResult, favoriteTeamID: favoriteTeamID) {
                 return false
             }
-            if let friend, !friend.isEmpty, !matchesFriend(game, filter: friend) {
+            if let friend, friend.isActive, !matchesFriend(game, filter: friend) {
                 return false
             }
             return true
@@ -110,9 +187,116 @@ enum GameLogFilter {
         return result.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
+    static func friendFilterOptions(
+        mutualFriends: [UserSearchResult],
+        games: [AttendedGame]
+    ) -> [GameFriendFilterOption] {
+        var options: [GameFriendFilterOption] = mutualFriends.map(GameFriendFilterOption.init(friend:))
+        var coveredKeys = Set(options.compactMap { $0.matchName?.lowercased() })
+        coveredKeys.formUnion(mutualFriends.map { $0.username.lowercased() })
+        coveredKeys.formUnion(mutualFriends.map { "@\($0.username)".lowercased() })
+
+        for name in friends(in: games) {
+            let key = name.lowercased()
+            guard !coveredKeys.contains(key) else { continue }
+            coveredKeys.insert(key)
+            options.append(
+                GameFriendFilterOption(
+                    id: "name:\(key)",
+                    chipLabel: name,
+                    linkedUserId: nil,
+                    matchName: name
+                )
+            )
+        }
+        return options
+    }
+
     /// Legacy helper for importing old comma-separated companion strings.
     static func companions(in games: [AttendedGame]) -> [String] {
         friends(in: games)
+    }
+
+    static func gamesTogether(with friend: UserSearchResult, in games: [AttendedGame]) -> [AttendedGame] {
+        games.filter { gameIncludes(friend, in: $0) }
+    }
+
+    static func gamesTogetherCount(with friend: UserSearchResult, in games: [AttendedGame]) -> Int {
+        gamesTogether(with: friend, in: games).count
+    }
+
+    static func rankMutualFriends(
+        _ friends: [UserSearchResult],
+        games: [AttendedGame],
+        mlbFavoriteTeamID: Int?,
+        kboFavoriteTeamID: Int?,
+        mode: FriendListRankMode
+    ) -> [RankedMutualFriend] {
+        friends
+            .map { friend in
+                let togetherGames = gamesTogether(with: friend, in: games)
+                return RankedMutualFriend(
+                    friend: friend,
+                    gamesTogether: togetherGames.count,
+                    togetherAttendance: LeaderboardEngine.favoriteAttendanceTogether(
+                        games: togetherGames,
+                        mlbFavoriteTeamID: mlbFavoriteTeamID,
+                        kboFavoriteTeamID: kboFavoriteTeamID
+                    )
+                )
+            }
+            .sorted { lhs, rhs in
+                switch mode {
+                case .gamesTogether:
+                    if lhs.gamesTogether != rhs.gamesTogether {
+                        return lhs.gamesTogether > rhs.gamesTogether
+                    }
+                case .winRate:
+                    let leftPct = lhs.togetherAttendance.winPercentage
+                    let rightPct = rhs.togetherAttendance.winPercentage
+                    switch (leftPct, rightPct) {
+                    case let (left?, right?) where left != right:
+                        return left > right
+                    case (nil, .some):
+                        return false
+                    case (.some, nil):
+                        return true
+                    default:
+                        if lhs.togetherAttendance.games != rhs.togetherAttendance.games {
+                            return lhs.togetherAttendance.games > rhs.togetherAttendance.games
+                        }
+                        if lhs.gamesTogether != rhs.gamesTogether {
+                            return lhs.gamesTogether > rhs.gamesTogether
+                        }
+                    }
+                }
+                return friendName(lhs.friend).localizedCaseInsensitiveCompare(friendName(rhs.friend)) == .orderedAscending
+            }
+    }
+
+    private static func friendName(_ friend: UserSearchResult) -> String {
+        friend.displayName.isEmpty ? friend.username : friend.displayName
+    }
+
+    private static func gameIncludes(_ friend: UserSearchResult, in game: AttendedGame) -> Bool {
+        game.friends.contains { gameFriend in
+            if let linkedUserId = gameFriend.resolvedLinkedUserId {
+                return linkedUserId == friend.userId
+            }
+            let name = gameFriend.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { return false }
+            let display = friend.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !display.isEmpty,
+               name.localizedCaseInsensitiveCompare(display) == .orderedSame {
+                return true
+            }
+            let username = friend.username.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !username.isEmpty,
+               name.localizedCaseInsensitiveCompare(username) == .orderedSame {
+                return true
+            }
+            return false
+        }
     }
 
     static func companionTokens(in text: String) -> [String] {
@@ -145,8 +329,21 @@ enum GameLogFilter {
         }
     }
 
-    private static func matchesFriend(_ game: AttendedGame, filter: String) -> Bool {
-        game.friendNames.contains { $0.localizedCaseInsensitiveCompare(filter) == .orderedSame }
+    private static func matchesFriend(_ game: AttendedGame, filter: GameFriendFilterOption) -> Bool {
+        game.friends.contains { gameFriend in
+            if let linkedUserId = filter.linkedUserId,
+               gameFriend.resolvedLinkedUserId == linkedUserId {
+                return true
+            }
+            if let matchName = filter.matchName?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !matchName.isEmpty {
+                let name = gameFriend.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                if name.localizedCaseInsensitiveCompare(matchName) == .orderedSame {
+                    return true
+                }
+            }
+            return false
+        }
     }
 }
 

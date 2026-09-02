@@ -46,4 +46,9 @@ enum AppAppearance {
         tabBar.unselectedItemTintColor = .white
         tabBar.barStyle = .black
     }
+
+    static func configureWindow() {
+        let background = UIColor(DesignTokens.background)
+        UIWindow.appearance().backgroundColor = background
+    }
 }

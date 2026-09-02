@@ -360,7 +360,7 @@ struct AddGameView: View {
                     .foregroundStyle(DesignTokens.primaryText)
 
                 diaryField(title: "Event/Giveaway", text: $viewModel.eventTitle)
-                FriendEditorView(friendNames: $viewModel.friendNames, appearance: .addGameDiary)
+                FriendEditorView(friends: $viewModel.friendEntries, appearance: .addGameDiary)
                 diaryField(title: "Notes", text: $viewModel.note)
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -395,6 +395,13 @@ struct AddGameView: View {
                         ) {
                             onSaved?(saved)
                             CloudSyncTrigger.game(saved, modelContext: modelContext)
+                            Task {
+                                try? await GameInviteService.shared.sendInvitesForNewLinkedFriends(
+                                    on: saved,
+                                    previousLinkedUserIds: [],
+                                    modelContext: modelContext
+                                )
+                            }
                             dismiss()
                         }
                     }

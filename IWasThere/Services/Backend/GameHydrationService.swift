@@ -6,7 +6,7 @@ import SwiftData
 enum GameHydrationService {
     static func hydrate(
         row: CloudAttendedGameRow,
-        friendNames: [String],
+        friends: [DiaryFriendEntry],
         modelContext: ModelContext,
         existingGameKeys: Set<String>
     ) async throws -> AttendedGame {
@@ -47,7 +47,10 @@ enum GameHydrationService {
 
         attended.eventTitle = row.eventTitle
         attended.note = row.note
-        GameFriendStore.setFriends(names: friendNames, on: attended, modelContext: modelContext)
+        if let invitedFrom = row.invitedFromUserId {
+            attended.invitedFromUserId = invitedFrom.uuidString
+        }
+        GameFriendStore.setFriends(entries: friends, on: attended, modelContext: modelContext)
 
         modelContext.insert(attended)
         for stat in attended.playerStats {

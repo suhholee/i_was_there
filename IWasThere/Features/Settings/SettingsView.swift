@@ -10,6 +10,11 @@ struct SettingsView: View {
     let onBack: () -> Void
 
     @State private var displayName: String = ""
+    @State private var username: String = ""
+    @State private var usernameStatus: SettingsUsernameStatus = .idle
+    @State private var usernameCheckTask: Task<Void, Never>?
+    @State private var avatarImage: UIImage?
+    @State private var profileVisibility: ProfileVisibility = .public
     @State private var activeLeague: League = .mlb
     @State private var mlbFavoriteID: Int = 0
     @State private var kboFavoriteID: Int = 0
@@ -18,18 +23,36 @@ struct SettingsView: View {
     @State private var homeBatterCategory: LeaderboardEngine.BatterCategory = .ops
     @State private var homePitcherCategory: LeaderboardEngine.PitcherCategory = .era
     @State private var savedSnapshot = SettingsSnapshot()
+    @State private var savedAvatarImage: UIImage?
     @State private var showUnsavedChangesAlert = false
     @State private var showSignOutConfirmation = false
 
+    private enum SettingsUsernameStatus: Equatable {
+        case idle
+        case checking
+        case available
+        case unavailable
+        case invalid(String)
+    }
+
     private var profile: UserProfile? { profiles.first }
 
+    private var canSaveUsername: Bool {
+        let normalized = UsernameRules.normalize(username)
+        if normalized == profile?.username { return true }
+        return usernameStatus == .available
+    }
+
     private var hasLocalUnsavedChanges: Bool {
-        currentSnapshot != savedSnapshot
+        currentSnapshot != savedSnapshot && canSaveUsername
     }
 
     private var currentSnapshot: SettingsSnapshot {
         SettingsSnapshot(
             displayName: displayName,
+            username: UsernameRules.normalize(username),
+            profileVisibility: profileVisibility,
+            avatarChanged: avatarImage != savedAvatarImage,
             activeLeague: activeLeague,
             mlbFavoriteID: mlbFavoriteID,
             kboFavoriteID: kboFavoriteID,
@@ -60,6 +83,51 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
+                    ProfileAvatarPicker(
+                        image: $avatarImage,
+                        diameter: 88,
+                        actionLabelBottomPadding: 8
+                    )
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 0, trailing: 16))
+
+                    HStack(spacing: 8) {
+                        Text("@")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(DesignTokens.secondaryText)
+                        TextField("username", text: $username)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                    .padding(12)
+                    .background(DesignTokens.surface.opacity(0.92))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                } header: {
+                    settingsSectionHeader("Account")
+                } footer: {
+                    settingsUsernameStatusFooter
+                }
+
+                Section {
+                    Picker("Profile visibility", selection: $profileVisibility) {
+                        ForEach(ProfileVisibility.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+
+                    TextField("Display name", text: $displayName)
+                } header: {
+                    settingsSectionHeader("Profile")
+                } footer: {
+                    Text(profileVisibility.subtitle)
+                        .font(.footnote)
+                }
+
+                Section {
                     Picker("Mode", selection: $activeLeague) {
                         ForEach(League.allCases) { league in
                             Text(league.title).tag(league)
@@ -71,8 +139,6 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    TextField("Display name", text: $displayName)
-
                     if activeLeague == .mlb {
                         Picker("Favorite team", selection: $mlbFavoriteID) {
                             Text("None").tag(0)
@@ -165,6 +231,9 @@ struct SettingsView: View {
                     }
                 }
             }
+            .listSectionSpacing(12)
+            .scrollContentBackground(.hidden)
+            .background(DesignTokens.background.ignoresSafeArea())
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
@@ -193,6 +262,9 @@ struct SettingsView: View {
             .onAppear {
                 loadFromProfile()
                 hasUnsavedChanges = hasLocalUnsavedChanges
+            }
+            .onChange(of: username) { _, newValue in
+                scheduleUsernameCheck(for: newValue)
             }
             .onChange(of: hasLocalUnsavedChanges) { _, changed in
                 hasUnsavedChanges = changed
@@ -229,6 +301,54 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var settingsUsernameStatusFooter: some View {
+        switch usernameStatus {
+        case .idle:
+            Text("Letters, numbers, and underscores only.")
+                .font(.footnote)
+        case .checking:
+            Text("Checking availability…")
+                .font(.footnote)
+        case .available:
+            Text("Username is available.")
+                .font(.footnote)
+                .foregroundStyle(DesignTokens.winGreen)
+        case .unavailable:
+            Text("That username is taken.")
+                .font(.footnote)
+                .foregroundStyle(DesignTokens.loseRed)
+        case .invalid(let message):
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(DesignTokens.loseRed)
+        }
+    }
+
+    private func scheduleUsernameCheck(for raw: String) {
+        usernameCheckTask?.cancel()
+
+        let normalized = UsernameRules.normalize(raw)
+        if normalized == profile?.username {
+            usernameStatus = .available
+            return
+        }
+
+        if let message = UsernameRules.validationMessage(for: raw) {
+            usernameStatus = .invalid(message)
+            return
+        }
+
+        usernameStatus = .checking
+        usernameCheckTask = Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            let available = await UsernameAvailabilityService.shared.isAvailable(normalized)
+            guard !Task.isCancelled else { return }
+            usernameStatus = available ? .available : .unavailable
+        }
+    }
+
     private func attemptBack() {
         dismissKeyboard()
         if hasLocalUnsavedChanges {
@@ -249,8 +369,11 @@ struct SettingsView: View {
 
     private func saveAll() {
         ensureProfile()
-        guard let profile = profiles.first else { return }
+        guard let profile = profiles.first, canSaveUsername else { return }
+        profile.setUsername(username)
+        profile.visibility = profileVisibility
         profile.displayName = displayName
+        try? ProfileAvatarPersistence.apply(image: avatarImage, to: profile)
         profile.league = activeLeague
         profile.homeMinPlateAppearances = parsedLeaderFilter(homeMinPA)
         profile.homeMinBattersFaced = parsedLeaderFilter(homeMinBF)
@@ -271,7 +394,9 @@ struct SettingsView: View {
 
         homeMinPA = leaderFilterDisplay(profile.homeMinPlateAppearances)
         homeMinBF = leaderFilterDisplay(profile.homeMinBattersFaced)
+        savedAvatarImage = avatarImage
         savedSnapshot = currentSnapshot
+        usernameStatus = .available
         try? modelContext.save()
         CloudSyncTrigger.profile(modelContext: modelContext)
     }
@@ -286,6 +411,11 @@ struct SettingsView: View {
         ensureProfile()
         guard let profile = profiles.first else { return }
         displayName = profile.displayName
+        username = profile.username
+        usernameStatus = profile.username.isEmpty ? .idle : .available
+        avatarImage = ProfileAvatarPersistence.loadImage(for: profile)
+        savedAvatarImage = avatarImage
+        profileVisibility = profile.visibility
         activeLeague = profile.league
         mlbFavoriteID = profile.favoriteTeamID ?? 0
         kboFavoriteID = profile.favoriteKBOTeamID ?? 0
@@ -320,6 +450,9 @@ struct SettingsView: View {
 
 private struct SettingsSnapshot: Equatable {
     var displayName: String = ""
+    var username: String = ""
+    var profileVisibility: ProfileVisibility = .public
+    var avatarChanged: Bool = false
     var activeLeague: League = .mlb
     var mlbFavoriteID: Int = 0
     var kboFavoriteID: Int = 0

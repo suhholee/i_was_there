@@ -1,9 +1,40 @@
 import Foundation
 import SwiftData
 
+enum ProfileVisibility: String, CaseIterable, Identifiable, Codable {
+    case `public` = "public"
+    case `private` = "private"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .public: "Public"
+        case .private: "Private"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .public:
+            "Any signed-in user can see your profile and games."
+        case .private:
+            "Only mutual follows can see your profile and games."
+        }
+    }
+}
+
 @Model
 final class UserProfile {
     var displayName: String
+    /// Unique handle without @ prefix (stored lowercase).
+    var username: String
+    /// Local cache path under Application Support.
+    var avatarRelativePath: String
+    /// Supabase Storage path in the `avatars` bucket.
+    var avatarStoragePath: String
+    /// `ProfileVisibility.rawValue`
+    var profileVisibility: String
     /// Favorite for MLB diary (Stats API team id).
     var favoriteTeamID: Int?
     var favoriteTeamAbbr: String?
@@ -13,6 +44,8 @@ final class UserProfile {
     /// `League.rawValue` — which diary Home/Games/Leaders show.
     var activeLeague: String
     var favoritePlayerIDs: [Int]
+    /// JSON array of `FavoritePlayerMeta` for display before any games are logged.
+    var favoritePlayerMetaJSON: String
     /// Min total PA to qualify for Home → Your leaders (batters).
     var homeMinPlateAppearances: Int
     /// Min total batters faced to qualify for Home → Your leaders (pitchers).
@@ -24,24 +57,34 @@ final class UserProfile {
 
     init(
         displayName: String = "",
+        username: String = "",
+        avatarRelativePath: String = "",
+        avatarStoragePath: String = "",
+        profileVisibility: String = ProfileVisibility.public.rawValue,
         favoriteTeamID: Int? = nil,
         favoriteTeamAbbr: String? = nil,
         favoriteKBOTeamID: Int? = nil,
         favoriteKBOTeamAbbr: String? = nil,
         activeLeague: String = League.mlb.rawValue,
         favoritePlayerIDs: [Int] = [],
+        favoritePlayerMetaJSON: String = "[]",
         homeMinPlateAppearances: Int = 0,
         homeMinBattersFaced: Int = 0,
         homeBatterStat: String = LeaderboardEngine.BatterCategory.ops.rawValue,
         homePitcherStat: String = LeaderboardEngine.PitcherCategory.era.rawValue
     ) {
         self.displayName = displayName
+        self.username = username
+        self.avatarRelativePath = avatarRelativePath
+        self.avatarStoragePath = avatarStoragePath
+        self.profileVisibility = profileVisibility
         self.favoriteTeamID = favoriteTeamID
         self.favoriteTeamAbbr = favoriteTeamAbbr
         self.favoriteKBOTeamID = favoriteKBOTeamID
         self.favoriteKBOTeamAbbr = favoriteKBOTeamAbbr
         self.activeLeague = activeLeague
         self.favoritePlayerIDs = favoritePlayerIDs
+        self.favoritePlayerMetaJSON = favoritePlayerMetaJSON
         self.homeMinPlateAppearances = homeMinPlateAppearances
         self.homeMinBattersFaced = homeMinBattersFaced
         self.homeBatterStat = homeBatterStat
@@ -51,6 +94,20 @@ final class UserProfile {
     var league: League {
         get { League(rawValue: activeLeague) ?? .mlb }
         set { activeLeague = newValue.rawValue }
+    }
+
+    var visibility: ProfileVisibility {
+        get { ProfileVisibility(rawValue: profileVisibility) ?? .public }
+        set { profileVisibility = newValue.rawValue }
+    }
+
+    var usernameTag: String {
+        let trimmed = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "" : "@\(trimmed)"
+    }
+
+    func setUsername(_ raw: String) {
+        username = UsernameRules.normalize(raw)
     }
 
     func favoriteTeamID(for league: League) -> Int? {
@@ -75,12 +132,48 @@ final class UserProfile {
         favoritePlayerIDs.contains(playerID)
     }
 
-    func toggleFavoritePlayer(_ playerID: Int) {
+    func toggleFavoritePlayer(_ playerID: Int, meta: FavoritePlayerMeta? = nil) {
         if let index = favoritePlayerIDs.firstIndex(of: playerID) {
             favoritePlayerIDs.remove(at: index)
+            removeFavoritePlayerMeta(playerID: playerID)
         } else {
             favoritePlayerIDs.append(playerID)
+            if let meta {
+                upsertFavoritePlayerMeta(meta)
+            }
         }
+    }
+
+    func favoritePlayerMetaByID() -> [Int: FavoritePlayerMeta] {
+        guard let data = favoritePlayerMetaJSON.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([FavoritePlayerMeta].self, from: data)
+        else { return [:] }
+        return Dictionary(uniqueKeysWithValues: decoded.map { ($0.playerID, $0) })
+    }
+
+    func upsertFavoritePlayerMeta(_ meta: FavoritePlayerMeta) {
+        var map = favoritePlayerMetaByID()
+        map[meta.playerID] = meta
+        persistFavoritePlayerMeta(map)
+    }
+
+    func removeFavoritePlayerMeta(playerID: Int) {
+        var map = favoritePlayerMetaByID()
+        map.removeValue(forKey: playerID)
+        persistFavoritePlayerMeta(map)
+    }
+
+    private func persistFavoritePlayerMeta(_ map: [Int: FavoritePlayerMeta]) {
+        let list = map.values.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+        guard let data = try? JSONEncoder().encode(list),
+              let json = String(data: data, encoding: .utf8)
+        else {
+            favoritePlayerMetaJSON = "[]"
+            return
+        }
+        favoritePlayerMetaJSON = json
     }
 
     func homeBatterCategory(for league: League) -> LeaderboardEngine.BatterCategory {
@@ -100,6 +193,55 @@ final class UserProfile {
 
     func setHomePitcherCategory(_ category: LeaderboardEngine.PitcherCategory) {
         homePitcherStat = category.rawValue
+    }
+}
+
+struct FavoritePlayerMeta: Codable, Hashable, Sendable {
+    let playerID: Int
+    var name: String
+    var jerseyNumber: String
+    var teamID: Int
+    var league: String
+    var position: String
+
+    init(
+        playerID: Int,
+        name: String,
+        jerseyNumber: String,
+        teamID: Int,
+        league: League,
+        position: String = ""
+    ) {
+        self.playerID = playerID
+        self.name = name
+        self.jerseyNumber = jerseyNumber
+        self.teamID = teamID
+        self.league = league.rawValue
+        self.position = position
+    }
+
+    var jerseyValueLabel: String {
+        let trimmed = position.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "BAT" : trimmed
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case playerID
+        case name
+        case jerseyNumber
+        case teamID
+        case league
+        case position
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        playerID = try container.decode(Int.self, forKey: .playerID)
+        name = try container.decode(String.self, forKey: .name)
+        jerseyNumber = try container.decode(String.self, forKey: .jerseyNumber)
+        teamID = try container.decode(Int.self, forKey: .teamID)
+        league = try container.decode(String.self, forKey: .league)
+        position = try container.decodeIfPresent(String.self, forKey: .position) ?? ""
     }
 }
 
@@ -143,6 +285,8 @@ final class AttendedGame {
     /// Freeform for now; later selectable Friends when accounts exist.
     var companions: String = ""
     var note: String = ""
+    /// Set when this diary was created by accepting a game share invite (inviter's user id).
+    var invitedFromUserId: String = ""
     var createdAt: Date = Date()
 
     @Relationship(deleteRule: .cascade, inverse: \GamePlayerStat.game)
@@ -180,6 +324,7 @@ final class AttendedGame {
         eventTitle: String = "",
         companions: String = "",
         note: String = "",
+        invitedFromUserId: String = "",
         createdAt: Date = .now,
         playerStats: [GamePlayerStat] = [],
         photos: [GamePhoto] = [],
@@ -210,6 +355,7 @@ final class AttendedGame {
         self.eventTitle = eventTitle
         self.companions = companions
         self.note = note
+        self.invitedFromUserId = invitedFromUserId
         self.createdAt = createdAt
         self.playerStats = playerStats
         self.photos = photos
@@ -259,14 +405,20 @@ final class AttendedGame {
 
     /// Date + first-pitch time in the **device's current timezone**.
     var localDateTimeLabel: String {
-        let dateText: String
+        "\(localDateLabel) · \(firstPitchAt.formatted(date: .omitted, time: .shortened))"
+    }
+
+    /// Date only (no first-pitch time).
+    var localDateLabel: String {
         if let day = MLBDateParsing.calendarDate(fromOfficial: officialDateString.isEmpty ? nil : officialDateString) {
-            dateText = day.formatted(date: .abbreviated, time: .omitted)
-        } else {
-            dateText = gameDate.formatted(date: .abbreviated, time: .omitted)
+            return day.formatted(date: .abbreviated, time: .omitted)
         }
-        let timeText = firstPitchAt.formatted(date: .omitted, time: .shortened)
-        return "\(dateText) · \(timeText)"
+        return gameDate.formatted(date: .abbreviated, time: .omitted)
+    }
+
+    /// Games list label: KBO schedule has no reliable first-pitch time in our feed.
+    var gameCardDateLabel: String {
+        resolvedLeague == .kbo ? localDateLabel : localDateTimeLabel
     }
 
     var localDateTimeLabelLong: String {
@@ -302,7 +454,11 @@ final class AttendedGame {
         let structured = friends
             .map { $0.name.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        if !structured.isEmpty { return structured }
+        if !structured.isEmpty {
+            return structured
+        }
+        // Only use legacy text when structured rows were never created.
+        guard friends.isEmpty else { return [] }
         return GameLogFilter.companionTokens(in: companions)
     }
 
@@ -310,8 +466,16 @@ final class AttendedGame {
         friendNames.joined(separator: ", ")
     }
 
+    /// `true` when this diary was created by accepting someone else's game invite.
+    var isSharedGameCopy: Bool {
+        !invitedFromUserId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     func syncCompanionsFromFriends() {
-        companions = friendsLabel
+        companions = friends
+            .map { $0.name.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
     }
 }
 
@@ -465,13 +629,17 @@ final class GamePlayerStat {
 @Model
 final class GameFriend {
     var name: String
-    /// Reserved for a linked #iWasThere account when social sync ships.
-    var linkedUserID: Int?
+    /// Linked #iWasThere account (`uuidString`); empty when not linked.
+    var linkedUserId: String = ""
     var game: AttendedGame?
 
-    init(name: String, linkedUserID: Int? = nil) {
+    init(name: String, linkedUserId: UUID? = nil) {
         self.name = name
-        self.linkedUserID = linkedUserID
+        self.linkedUserId = linkedUserId?.uuidString ?? ""
+    }
+
+    var resolvedLinkedUserId: UUID? {
+        linkedUserId.isEmpty ? nil : UUID(uuidString: linkedUserId)
     }
 }
 

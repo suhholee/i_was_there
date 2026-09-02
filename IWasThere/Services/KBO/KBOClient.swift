@@ -315,6 +315,57 @@ struct KBOHitterBoxDTO: Decodable, Sendable {
     let run_cn: String?
     let hit_cn: String?
     let rbi_cn: String?
+    /// Inning-by-inning result strings (e.g. `좌중홈` = home run).
+    let inningPlays: [String]
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicCodingKey.self)
+        func decode(_ key: String) -> String? {
+            try? container.decodeIfPresent(String.self, forKey: DynamicCodingKey(key))
+        }
+
+        g_id = decode("g_id")
+        p_id = decode("p_id")
+        tb_sc = decode("tb_sc")
+        bat_order_no = decode("bat_order_no")
+        pos_if = decode("pos_if")
+        ab_cn = decode("ab_cn")
+        run_cn = decode("run_cn")
+        hit_cn = decode("hit_cn")
+        rbi_cn = decode("rbi_cn")
+
+        inningPlays = container.allKeys.compactMap { key in
+            guard key.stringValue.hasPrefix("inn"),
+                  key.stringValue.hasSuffix("_if"),
+                  let play = try? container.decode(String.self, forKey: key),
+                  !play.isEmpty
+            else { return nil }
+            return play
+        }
+    }
+
+    /// Sports2i hitter box omits `hr_cn`; home runs appear in play strings ending with `홈`.
+    var derivedHomeRuns: Int {
+        inningPlays.filter { $0.hasSuffix("홈") }.count
+    }
+}
+
+private struct DynamicCodingKey: CodingKey {
+    let stringValue: String
+    var intValue: Int?
+
+    init(_ stringValue: String) {
+        self.stringValue = stringValue
+        intValue = nil
+    }
+
+    init?(stringValue: String) {
+        self.init(stringValue)
+    }
+
+    init?(intValue: Int) {
+        nil
+    }
 }
 
 struct KBOPitcherBoxDTO: Decodable, Sendable {

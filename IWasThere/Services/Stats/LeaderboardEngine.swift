@@ -336,7 +336,7 @@ enum LeaderboardEngine {
         case .mlb:
             return Array(BatterCategory.allCases)
         case .kbo:
-            return [.avg, .hits, .runs, .rbi, .mvp]
+            return [.avg, .hits, .runs, .rbi, .hr, .mvp]
         }
     }
 
@@ -407,6 +407,29 @@ enum LeaderboardEngine {
         var winPercentageLabel: String {
             StatFormulas.formatWinPercentage(winPercentage)
         }
+    }
+
+    static func favoriteAttendanceTogether(
+        games: [AttendedGame],
+        mlbFavoriteTeamID: Int?,
+        kboFavoriteTeamID: Int?
+    ) -> AttendanceRecord {
+        var wins = 0
+        var losses = 0
+        for game in games {
+            let favoriteTeamID: Int?
+            switch game.resolvedLeague {
+            case .mlb: favoriteTeamID = mlbFavoriteTeamID
+            case .kbo: favoriteTeamID = kboFavoriteTeamID
+            }
+            guard let favoriteTeamID else { continue }
+            switch game.favoriteTeamWon(favoriteTeamID: favoriteTeamID) {
+            case true?: wins += 1
+            case false?: losses += 1
+            case nil: break
+            }
+        }
+        return AttendanceRecord(wins: wins, losses: losses)
     }
 
     static func favoriteAttendance(
@@ -834,7 +857,8 @@ enum LeaderboardEngine {
         batterCategory: BatterCategory,
         pitcherCategory: PitcherCategory,
         minPlateAppearances: Int = 0,
-        minBattersFaced: Int = 0
+        minBattersFaced: Int = 0,
+        playerMeta: [Int: FavoritePlayerMeta] = [:]
     ) -> [FavoritePlayerSummary] {
         guard !playerIDs.isEmpty else { return [] }
 
@@ -861,6 +885,16 @@ enum LeaderboardEngine {
             let batter = batterByID[playerID]
             let pitcher = pitcherByID[playerID]
             guard batter != nil || pitcher != nil else {
+                if let meta = playerMeta[playerID] {
+                    return FavoritePlayerSummary(
+                        playerID: playerID,
+                        playerName: meta.name,
+                        jerseyNumber: meta.jerseyNumber,
+                        teamID: meta.teamID,
+                        batter: nil,
+                        pitcher: nil
+                    )
+                }
                 return FavoritePlayerSummary(
                     playerID: playerID,
                     playerName: "Player \(playerID)",

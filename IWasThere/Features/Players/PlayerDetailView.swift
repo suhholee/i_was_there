@@ -138,7 +138,15 @@ struct PlayerDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if let profile = profiles.first {
-                    FavoritePlayerStarButton(playerID: playerID, profile: profile) {
+                    FavoritePlayerStarButton(
+                        playerID: playerID,
+                        profile: profile,
+                        playerName: person?.fullName ?? playerName,
+                        jerseyNumber: person?.primaryNumber ?? jerseyNumber,
+                        teamID: person?.currentTeam?.id ?? teamID,
+                        league: league,
+                        position: person?.primaryPosition?.abbreviation ?? ""
+                    ) {
                         try? modelContext.save()
                         CloudSyncTrigger.profile(modelContext: modelContext)
                     }

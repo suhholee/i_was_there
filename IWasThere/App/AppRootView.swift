@@ -35,6 +35,8 @@ struct AppRootView: View {
                 SignInView(auth: auth)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DesignTokens.background.ignoresSafeArea())
         .task {
             await auth.bootstrap()
         }
@@ -59,13 +61,19 @@ struct AppRootView: View {
                     modelContext: modelContext,
                     userId: userId
                 )
-                postAuthPhase = auth.shouldShowProfileOnboarding ? .onboarding : .main
+                postAuthPhase = shouldShowOnboarding ? .onboarding : .main
             }
         }
         .onChange(of: auth.shouldShowProfileOnboarding) { _, shouldShow in
             guard auth.isAuthenticated, shouldShow else { return }
             postAuthPhase = .onboarding
         }
+    }
+
+    private var shouldShowOnboarding: Bool {
+        if auth.shouldShowProfileOnboarding { return true }
+        let profiles = (try? modelContext.fetch(FetchDescriptor<UserProfile>())) ?? []
+        return profiles.first?.username.isEmpty ?? true
     }
 }
 
@@ -74,11 +82,7 @@ private struct LaunchLoadingView: View {
         ZStack {
             StadiumAuthBackground()
             VStack(spacing: 16) {
-                Image(systemName: "baseball.fill")
-                    .font(.title)
-                    .foregroundStyle(DesignTokens.accent)
-                ProgressView()
-                    .tint(.white)
+                SpinningBaseballView()
             }
         }
         .preferredColorScheme(.dark)
