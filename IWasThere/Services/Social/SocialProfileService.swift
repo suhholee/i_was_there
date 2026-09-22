@@ -46,10 +46,9 @@ final class SocialProfileService {
         return rows.first
     }
 
-    func loadVisibleGames(
-        for profile: PublicUserProfile,
-        modelContext: ModelContext
-    ) async throws -> [AttendedGame] {
+    /// Fast path for People → profile Games list.
+    /// Returns cloud rows immediately (scores/starters when present). Friend names are attached separately.
+    func loadVisibleGameSummaries(for profile: PublicUserProfile) async throws -> [RemoteGameSummary] {
         guard profile.canViewGames else { return [] }
 
         let client = try requireClient()
@@ -58,43 +57,239 @@ final class SocialProfileService {
             .execute()
             .value
 
-        var hydrated: [AttendedGame] = []
-        var keys = Set<String>()
+        return rows.map { row in
+            RemoteGameSummary(
+                id: row.id,
+                row: row,
+                friendNames: []
+            )
+        }
+    }
 
-        for row in rows {
-            let friends: [RemoteGameFriendRow] = try await client
+    /// Fills `friendNames` without blocking the initial games + score paint.
+    func attachFriendNames(
+        to summaries: [RemoteGameSummary],
+        profileUserId: UUID
+    ) async -> [RemoteGameSummary] {
+        guard !summaries.isEmpty else { return summaries }
+        guard let client = try? requireClient() else { return summaries }
+
+        let namesByGame = await loadFriendNamesByGame(
+            client: client,
+            userId: profileUserId,
+            gameIds: summaries.map(\.id)
+        )
+        guard !namesByGame.isEmpty else { return summaries }
+
+        return summaries.map { summary in
+            RemoteGameSummary(
+                id: summary.id,
+                row: summary.row,
+                friendNames: namesByGame[summary.id] ?? summary.friendNames
+            )
+        }
+    }
+
+    /// Lightweight schedule/box fill-in for cards still missing scores/team ids.
+    /// Does not block the initial list; call after `loadVisibleGameSummaries`.
+    func enrichMissingDisplaySnapshots(
+        _ summaries: [RemoteGameSummary]
+    ) async -> [RemoteGameSummary] {
+        let missing = summaries.filter(\.needsEnrichment)
+        guard !missing.isEmpty else { return summaries }
+
+        var updates: [UUID: CloudAttendedGameRow] = [:]
+        await withTaskGroup(of: (UUID, CloudAttendedGameRow)?.self) { group in
+            for summary in missing {
+                group.addTask { @MainActor in
+                    guard let enriched = await Self.fetchDisplaySnapshot(for: summary.row) else {
+                        return nil
+                    }
+                    return (summary.id, enriched)
+                }
+            }
+            for await item in group {
+                guard let item else { continue }
+                updates[item.0] = item.1
+            }
+        }
+
+        guard !updates.isEmpty else { return summaries }
+        return summaries.map { summary in
+            guard let row = updates[summary.id] else { return summary }
+            return summary.applying(row: row)
+        }
+    }
+
+    private static func fetchDisplaySnapshot(for row: CloudAttendedGameRow) async -> CloudAttendedGameRow? {
+        let league = League(rawValue: row.league) ?? .mlb
+        switch league {
+        case .mlb:
+            return await fetchMLBDisplaySnapshot(for: row)
+        case .kbo:
+            return await fetchKBODisplaySnapshot(for: row)
+        }
+    }
+
+    private static func fetchMLBDisplaySnapshot(for row: CloudAttendedGameRow) async -> CloudAttendedGameRow? {
+        do {
+            let needsStarters = (row.homeStarterName ?? "").isEmpty || (row.awayStarterName ?? "").isEmpty
+
+            async let scheduleTask = MLBClient.shared.findScheduleGame(
+                gamePk: row.mlbGamePk,
+                around: row.gameDate
+            )
+            async let boxscoreTask: MLBBoxscoreResponse? = {
+                guard needsStarters else { return nil }
+                return try? await MLBClient.shared.boxscore(gamePk: row.mlbGamePk)
+            }()
+
+            let schedule = try await scheduleTask
+            let boxscore = await boxscoreTask
+
+            let awayScore = schedule.teams.away.score ?? row.awayScore
+            let homeScore = schedule.teams.home.score ?? row.homeScore
+            let awayWon = schedule.teams.away.isWinner
+                ?? (awayScore != nil && homeScore != nil ? awayScore! > homeScore! : row.awayWon)
+            let homeWon = schedule.teams.home.isWinner
+                ?? (awayScore != nil && homeScore != nil ? homeScore! > awayScore! : row.homeWon)
+
+            var awayStarter = row.awayStarterName
+            var homeStarter = row.homeStarterName
+            if let boxscore {
+                if (awayStarter ?? "").isEmpty {
+                    awayStarter = StarterBackfill.starterName(from: boxscore.teams.away)
+                }
+                if (homeStarter ?? "").isEmpty {
+                    homeStarter = StarterBackfill.starterName(from: boxscore.teams.home)
+                }
+            }
+
+            return row.withDisplaySnapshot(
+                homeScore: homeScore,
+                awayScore: awayScore,
+                homeTeamId: schedule.teams.home.team.id,
+                awayTeamId: schedule.teams.away.team.id,
+                homeStarterName: homeStarter,
+                awayStarterName: awayStarter,
+                homeWon: homeWon,
+                awayWon: awayWon,
+                awayTeamName: schedule.teams.away.team.name,
+                homeTeamName: schedule.teams.home.team.name
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    private static func fetchKBODisplaySnapshot(for row: CloudAttendedGameRow) async -> CloudAttendedGameRow? {
+        guard !row.kboGameId.isEmpty else { return nil }
+        do {
+            let schedule = try await KBOClient.shared.findScheduleGame(
+                gameID: row.kboGameId,
+                gDt: row.kboGDt,
+                season: row.season
+            )
+            let payload = try await KBOClient.shared.boxPayload(game: schedule)
+            let attended = try KBOBoxscoreImporter.makeAttendedGame(
+                from: payload,
+                existingGameKeys: []
+            )
+            return row.withDisplaySnapshot(
+                homeScore: attended.homeScore,
+                awayScore: attended.awayScore,
+                homeTeamId: attended.homeTeamID,
+                awayTeamId: attended.awayTeamID,
+                homeStarterName: attended.homeStarterName,
+                awayStarterName: attended.awayStarterName,
+                homeWon: attended.homeWon,
+                awayWon: attended.awayWon,
+                awayTeamName: attended.awayTeamName,
+                homeTeamName: attended.homeTeamName
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    /// Prefers the batched RPC; falls back to parallel per-game calls if migration 017 is not applied yet.
+    private func loadFriendNamesByGame(
+        client: SupabaseClient,
+        userId: UUID,
+        gameIds: [UUID]
+    ) async -> [UUID: [String]] {
+        guard !gameIds.isEmpty else { return [:] }
+
+        do {
+            let friendRows: [RemoteGameFriendNameRow] = try await client
+                .rpc("list_user_games_friend_names", params: ["target_user_id": userId.uuidString])
+                .execute()
+                .value
+            var namesByGame: [UUID: [String]] = [:]
+            for friend in friendRows {
+                namesByGame[friend.gameId, default: []].append(friend.name)
+            }
+            return namesByGame
+        } catch {
+            var namesByGame: [UUID: [String]] = [:]
+            await withTaskGroup(of: (UUID, [String]).self) { group in
+                for gameId in gameIds {
+                    group.addTask { @MainActor in
+                        let friends: [RemoteGameFriendRow] = (try? await client
+                            .rpc("list_user_game_friends", params: ["p_game_id": gameId.uuidString])
+                            .execute()
+                            .value) ?? []
+                        return (gameId, friends.map(\.name))
+                    }
+                }
+                for await (gameId, names) in group {
+                    namesByGame[gameId] = names
+                }
+            }
+            return namesByGame
+        }
+    }
+
+    /// Hydrates a single remote game for detail (MLB/KBO + friends + photos).
+    func loadVisibleGameDetail(
+        summary: RemoteGameSummary,
+        modelContext: ModelContext
+    ) async throws -> AttendedGame {
+        let client = try requireClient()
+        let row = summary.row
+
+        let friends: [DiaryFriendEntry]
+        if summary.friendNames.isEmpty {
+            let remoteFriends: [RemoteGameFriendRow] = try await client
                 .rpc("list_user_game_friends", params: ["p_game_id": row.id.uuidString])
                 .execute()
                 .value
+            friends = remoteFriends.map { DiaryFriendEntry(name: $0.name, linkedUserId: nil) }
+        } else {
+            friends = summary.friendNames.map { DiaryFriendEntry(name: $0, linkedUserId: nil) }
+        }
 
-            let game = try await GameHydrationService.hydrate(
-                row: row,
-                friends: friends.map {
-                    DiaryFriendEntry(name: $0.name, linkedUserId: nil)
-                },
-                modelContext: modelContext,
-                existingGameKeys: keys
+        let game = try await GameHydrationService.hydrate(
+            row: row,
+            friends: friends,
+            modelContext: modelContext,
+            existingGameKeys: []
+        )
+
+        let photoRows: [RemoteGamePhotoRow] = try await client
+            .rpc("list_user_game_photos", params: ["p_game_id": row.id.uuidString])
+            .execute()
+            .value
+        for photoRow in photoRows {
+            try await attachRemotePhoto(
+                storagePath: photoRow.storagePath,
+                to: game,
+                modelContext: modelContext
             )
-            keys.insert(row.gameKey)
-
-            let photoRows: [RemoteGamePhotoRow] = try await client
-                .rpc("list_user_game_photos", params: ["p_game_id": row.id.uuidString])
-                .execute()
-                .value
-
-            for photoRow in photoRows {
-                try await attachRemotePhoto(
-                    storagePath: photoRow.storagePath,
-                    to: game,
-                    modelContext: modelContext
-                )
-            }
-
-            hydrated.append(game)
         }
 
         try? modelContext.save()
-        return hydrated
+        return game
     }
 
     func downloadAvatar(path: String?, forceRefresh: Bool = false) async -> UIImage? {

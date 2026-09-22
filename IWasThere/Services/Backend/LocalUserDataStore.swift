@@ -4,6 +4,7 @@ import SwiftData
 /// Clears on-device diary data when switching accounts or signing out.
 enum LocalUserDataStore {
     private static let lastCloudUserIdKey = "lastCloudSyncUserId"
+    private static let displaySnapshotBackfillKeyPrefix = "displaySnapshotBackfill:"
 
     static func lastSyncedUserId() -> UUID? {
         guard let raw = UserDefaults.standard.string(forKey: lastCloudUserIdKey) else { return nil }
@@ -16,6 +17,18 @@ enum LocalUserDataStore {
 
     static func clearSyncedUserId() {
         UserDefaults.standard.removeObject(forKey: lastCloudUserIdKey)
+    }
+
+    static func hasBackfilledDisplaySnapshots(for userId: UUID) -> Bool {
+        UserDefaults.standard.bool(forKey: displaySnapshotBackfillKeyPrefix + userId.uuidString)
+    }
+
+    static func markDisplaySnapshotsBackfilled(for userId: UUID) {
+        UserDefaults.standard.set(true, forKey: displaySnapshotBackfillKeyPrefix + userId.uuidString)
+    }
+
+    static func clearDisplaySnapshotBackfill(for userId: UUID) {
+        UserDefaults.standard.removeObject(forKey: displaySnapshotBackfillKeyPrefix + userId.uuidString)
     }
 
     static func clearUserData(modelContext: ModelContext) {

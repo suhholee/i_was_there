@@ -1,15 +1,17 @@
 # Backend setup (Supabase) — email sign-in (no Apple Developer fee)
 
-The cloud database stores **only user-owned data**. Scores, box scores, and player stat lines are **not** uploaded — the app re-fetches those from the MLB Stats API and Sports2i KBO API using `game_key` identifiers.
+The cloud database stores **user-owned data** plus a small **display snapshot** (scores, team ids, starters) so friend profiles can list games quickly. Full box-score player lines are **not** uploaded — opening a game detail still re-fetches those from the MLB Stats API and Sports2i KBO API using `game_key` identifiers.
 
 ## What is stored in Supabase
 
 | Table | Contents |
 |-------|----------|
 | `profiles` | Display name, @username, avatar, public/private visibility, favorite teams, league mode, leader filters |
-| `attended_games` | Which games you attended + diary (`event_title`, `note`) + API lookup keys |
+| `attended_games` | Which games you attended + diary (`event_title`, `note`) + API lookup keys + **display snapshot** (scores, team ids, starters) for fast friend-profile lists |
 | `game_friends` | Friend names per game (text now; `linked_user_id` later) |
 | `game_photos` | Storage path metadata (JPEG bytes in Storage) |
+
+Full box-score player lines are still **not** stored — opening a friend's game detail re-fetches those from MLB/KBO.
 
 ---
 
@@ -106,6 +108,32 @@ Then run `supabase/migrations/014_leave_shared_game_notifications.sql` for leave
 If delete fails with `invited_from_user_id`, run `supabase/migrations/015_fix_shared_game_delete_and_friends.sql` (adds the column, fixes delete, and corrects shared-game friend lists).
 
 When the owner deletes a game, run `supabase/migrations/016_owner_delete_cascades_friends.sql` so invited friends' copies are removed from the cloud too.
+
+For **fast People → friend Games lists** (no live MLB/KBO per game), run `supabase/migrations/017_attended_game_display_snapshot.sql` (after `016`), then `supabase/migrations/018_refresh_list_attended_games.sql` so PostgREST returns the new score/starter columns. Have each account open the app once so games re-sync snapshots to the cloud.
+
+Until a friend’s account has re-synced, the app still shows their game list immediately from Supabase and **fills in missing scores in the background** via a lightweight schedule fetch (hybrid).
+
+For **per-game friend privacy** (“Show friends to others”), run `supabase/migrations/019_friends_visible_to_others.sql`. When the toggle is off, other users no longer receive companion names from `list_user_game_friends` / `list_user_games_friend_names`.
+
+For **rooted-for team** on games without your favorite club, run `supabase/migrations/020_rooted_for_team.sql`.
+
+### Backfill existing rows (all users at once)
+
+Games logged **before** migration `017` have `NULL` scores/starters in the database until each device re-syncs. To fix every row **now**:
+
+1. In Supabase **SQL Editor**, confirm which rows are missing data:
+   - Run `supabase/scripts/list_games_missing_snapshot.sql`
+2. Export your **service_role** key (Project Settings → API — never commit it or ship it in the app).
+3. From the repo root:
+
+```bash
+export SUPABASE_URL="https://YOUR_REF.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+python3 Scripts/backfill_attended_game_snapshots.py --dry-run
+python3 Scripts/backfill_attended_game_snapshots.py
+```
+
+The script reads `attended_games`, calls MLB/KBO for each row that needs a snapshot, and PATCHes Supabase. After it finishes, friend profile Games lists should show scores/starters on first load without waiting for hybrid fill-in.
 
 **Phase 5 (diary @tag friends):** iOS syncs `linked_user_id` on `game_friends` when you tag a mutual friend in a game diary. No extra migration beyond `008` for new installs.
 

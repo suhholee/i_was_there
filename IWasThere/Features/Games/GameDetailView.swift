@@ -17,6 +17,7 @@ struct GameDetailView: View {
     @State private var draftFriendEntries: [DiaryFriendEntry] = []
     @State private var lockedFriendEntries: [DiaryFriendEntry] = []
     @State private var draftNote = ""
+    @State private var draftFriendsVisibleToOthers = true
 
     private var canRemoveFriends: Bool {
         !game.isSharedGameCopy
@@ -47,6 +48,9 @@ struct GameDetailView: View {
             return true
         }
         if draftNote.trimmingCharacters(in: .whitespacesAndNewlines) != game.note {
+            return true
+        }
+        if draftFriendsVisibleToOthers != game.friendsVisibleToOthers {
             return true
         }
         let baseline = GameFriendStore.entries(from: game)
@@ -90,6 +94,9 @@ struct GameDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
+                    if !isReadOnly {
+                        rootedForSection
+                    }
 
                     let topBatter = LeaderboardEngine.gameLeaderBatter(
                         in: game,
@@ -247,7 +254,7 @@ struct GameDetailView: View {
                     .foregroundStyle(DesignTokens.cardPrimaryText)
                 Spacer(minLength: 8)
                 FavoriteResultBadge(
-                    won: game.favoriteTeamWon(favoriteTeamID: favoriteTeamID),
+                    outcome: game.displayResult(favoriteTeamID: favoriteTeamID),
                     compact: false
                 )
             }
@@ -275,7 +282,7 @@ struct GameDetailView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(DesignTokens.accent)
             }
-            if !game.friendsLabel.isEmpty {
+            if !game.friendsLabel.isEmpty && (game.friendsVisibleToOthers || !isReadOnly) {
                 Text("w/ \(game.friendsLabel)")
                     .font(.subheadline)
                     .foregroundStyle(DesignTokens.cardSecondaryText)
@@ -285,6 +292,97 @@ struct GameDetailView: View {
         .padding(16)
         .background(DesignTokens.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var rootedForSection: some View {
+        if !game.involvesFavoriteTeam(favoriteTeamID: favoriteTeamID) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Who did you root for?")
+                    .font(.headline)
+                    .foregroundStyle(DesignTokens.primaryText)
+
+                Text("Your favorite team wasn’t in this game. Pick a side and optionally count it in your win rate.")
+                    .font(.subheadline)
+                    .foregroundStyle(DesignTokens.secondaryText)
+
+                HStack(spacing: 8) {
+                    rootedTeamButton(
+                        teamID: game.awayTeamID,
+                        title: game.awayTeamName
+                    )
+                    rootedTeamButton(
+                        teamID: game.homeTeamID,
+                        title: game.homeTeamName
+                    )
+                }
+
+                if game.rootedForTeamID != nil {
+                    Button("Clear selection") {
+                        game.rootedForTeamID = nil
+                        game.includeRootedTeamInWinRate = false
+                        persistRootedForChoice()
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DesignTokens.secondaryText)
+
+                    Toggle(isOn: Binding(
+                        get: { game.includeRootedTeamInWinRate },
+                        set: { newValue in
+                            game.includeRootedTeamInWinRate = newValue
+                            persistRootedForChoice()
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Include in win rate")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(DesignTokens.primaryText)
+                            Text("Counts toward Home W–L and “My team W/L” filters.")
+                                .font(.caption)
+                                .foregroundStyle(DesignTokens.secondaryText)
+                        }
+                    }
+                    .tint(DesignTokens.accent)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DesignTokens.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+    }
+
+    private func rootedTeamButton(teamID: Int, title: String) -> some View {
+        let selected = game.rootedForTeamID == teamID
+        return Button {
+            if selected {
+                game.rootedForTeamID = nil
+                game.includeRootedTeamInWinRate = false
+            } else {
+                game.rootedForTeamID = teamID
+            }
+            persistRootedForChoice()
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(selected ? DesignTokens.primaryText : DesignTokens.secondaryText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 8)
+                .background(selected ? DesignTokens.accent.opacity(0.28) : DesignTokens.background.opacity(0.35))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(selected ? DesignTokens.accent : Color.clear, lineWidth: 1.5)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func persistRootedForChoice() {
+        try? modelContext.save()
+        CloudSyncTrigger.game(game, modelContext: modelContext)
     }
 
     private func gameLeaderCard(
@@ -370,11 +468,20 @@ struct GameDetailView: View {
                     friends: $draftFriendEntries,
                     canRemoveFriends: canRemoveFriends
                 )
+                friendsVisibilityToggle
                 diaryEditor(title: "Notes", text: $draftNote)
                 photoSection(editing: true)
             } else {
                 diaryReadRow(title: "Event/Giveaway", value: game.eventTitle)
-                diaryReadRow(title: "Friends", value: game.friendsLabel)
+                if game.friendsVisibleToOthers || !isReadOnly {
+                    diaryReadRow(title: "Friends", value: game.friendsLabel)
+                }
+                if !isReadOnly {
+                    diaryReadRow(
+                        title: "Friends visibility",
+                        value: game.friendsVisibleToOthers ? "Visible to others" : "Hidden from others"
+                    )
+                }
                 diaryReadRow(title: "Notes", value: game.note)
                 photoSection(editing: false)
             }
@@ -412,6 +519,23 @@ struct GameDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .lineLimit(2...5)
         }
+    }
+
+    private var friendsVisibilityToggle: some View {
+        Toggle(isOn: $draftFriendsVisibleToOthers) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Show friends to others")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DesignTokens.primaryText)
+                Text("When off, other users won’t see who you went with on this game.")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.secondaryText)
+            }
+        }
+        .tint(DesignTokens.accent)
+        .padding(10)
+        .background(DesignTokens.background.opacity(0.35))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private func photoSection(editing: Bool) -> some View {
@@ -469,6 +593,7 @@ struct GameDetailView: View {
         draftFriendEntries = GameFriendStore.entries(from: game)
         lockedFriendEntries = canRemoveFriends ? [] : draftFriendEntries
         draftNote = game.note
+        draftFriendsVisibleToOthers = game.friendsVisibleToOthers
         isEditingDiary = true
     }
 
@@ -489,6 +614,7 @@ struct GameDetailView: View {
             )
         GameFriendStore.setFriends(entries: friendEntries, on: game, modelContext: modelContext)
         game.note = draftNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        game.friendsVisibleToOthers = draftFriendsVisibleToOthers
         try? modelContext.save()
         isEditingDiary = false
         lockedFriendEntries = []

@@ -29,6 +29,7 @@ actor KBOClient {
                 return KBOScheduleGame(dto: dto)
             }
             .sorted { $0.gameID < $1.gameID }
+            .annotatedForDoubleheaders()
     }
 
     /// Locate a schedule row for hydration after cloud restore.
@@ -204,28 +205,22 @@ struct KBOScheduleGame: Identifiable, Hashable, Sendable {
     let seriesID: String
     /// Sports2i stadium code (`s_id`).
     let stadiumCode: String
+    /// 1-based slot when this matchup is a same-day doubleheader; `nil` for single games.
+    var doubleheaderGameNumber: Int?
 
     var isFinal: Bool { stateCode == "3" }
     var isRegularSeason: Bool { seriesID == "0" || seriesID.isEmpty }
+    var isDoubleheader: Bool { doubleheaderGameNumber != nil }
 
     var homeTeam: KBOTeamInfo { KBOTeamCatalog.team(code: homeCode) ?? .init(id: 9199, code: homeCode, name: homeCode, abbreviation: homeCode, homeStadiumName: "") }
     var awayTeam: KBOTeamInfo { KBOTeamCatalog.team(code: awayCode) ?? .init(id: 9198, code: awayCode, name: awayCode, abbreviation: awayCode, homeStadiumName: "") }
 
     var matchupLabel: String {
         let base = "\(awayTeam.name) @ \(homeTeam.name)"
-        if let gameNumber = gameNumberLabel {
-            return "\(base) · \(gameNumber)"
+        if let gameNumber = doubleheaderGameNumber {
+            return "\(base) · Doubleheader · Game \(gameNumber)"
         }
         return base
-    }
-
-    /// Doubleheader game index from `g_id` suffix (e.g. `…HHLG1` → Game 2).
-    var gameNumberLabel: String? {
-        guard gameID.count >= 2 else { return nil }
-        let suffix = gameID.suffix(2)
-        guard suffix.last == "0", let digit = suffix.first, digit.isNumber else { return nil }
-        let number = Int(String(digit)) ?? 0
-        return "Game \(number + 1)"
     }
 
     init(dto: KBOScheduleGameDTO) {
@@ -237,10 +232,32 @@ struct KBOScheduleGame: Identifiable, Hashable, Sendable {
         gameDateText = dto.g_dt ?? ""
         seriesID = dto.sr_id ?? "0"
         stadiumCode = dto.s_id ?? ""
+        doubleheaderGameNumber = nil
         if let raw = dto.g_id, raw.count >= 8 {
             gDt = String(raw.prefix(8))
         } else {
             gDt = ""
+        }
+    }
+}
+
+extension Array where Element == KBOScheduleGame {
+    /// Marks same-day, same-matchup pairs as doubleheaders (Sports2i `g_id` ends in 0/1 or 1/2).
+    func annotatedForDoubleheaders() -> [KBOScheduleGame] {
+        var byPair: [String: [KBOScheduleGame]] = [:]
+        for game in self {
+            let key = "\(game.gDt)|\(game.awayCode)|\(game.homeCode)"
+            byPair[key, default: []].append(game)
+        }
+        return map { game in
+            let key = "\(game.gDt)|\(game.awayCode)|\(game.homeCode)"
+            let siblings = (byPair[key] ?? []).sorted { $0.gameID < $1.gameID }
+            guard siblings.count > 1,
+                  let index = siblings.firstIndex(where: { $0.gameID == game.gameID })
+            else { return game }
+            var annotated = game
+            annotated.doubleheaderGameNumber = index + 1
+            return annotated
         }
     }
 }

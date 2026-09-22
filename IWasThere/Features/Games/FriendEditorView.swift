@@ -85,15 +85,24 @@ struct FriendEditorView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
-                    TextField("Name or @username", text: $newFriendName)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .submitLabel(.done)
-                        .onSubmit(addPlainFriend)
-                        .padding(fieldPadding)
-                        .background(fieldBackground)
-                        .foregroundStyle(fieldTextColor)
-                        .clipShape(RoundedRectangle(cornerRadius: fieldCornerRadius, style: .continuous))
+                    ZStack(alignment: .leading) {
+                        if trimmedInput.isEmpty {
+                            Text("Name or @username")
+                                .font(.body)
+                                .foregroundStyle(placeholderColor)
+                                .padding(.horizontal, fieldPadding)
+                                .allowsHitTesting(false)
+                        }
+                        TextField("", text: $newFriendName)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .submitLabel(.done)
+                            .onSubmit(addPlainFriend)
+                            .padding(fieldPadding)
+                            .foregroundStyle(fieldTextColor)
+                    }
+                    .background(fieldBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: fieldCornerRadius, style: .continuous))
 
                     Button("Add", action: addPlainFriend)
                         .font(.subheadline.weight(.semibold))
@@ -165,6 +174,12 @@ struct FriendEditorView: View {
         appearance == .gameDetailDiary
             ? DesignTokens.cardSecondaryText
             : DesignTokens.secondaryText
+    }
+
+    private var placeholderColor: Color {
+        appearance == .gameDetailDiary
+            ? DesignTokens.cardSecondaryText
+            : DesignTokens.secondaryText.opacity(0.85)
     }
 
     private var fieldPadding: CGFloat {
@@ -241,6 +256,85 @@ enum GameFriendStore {
 
     static func containsLinkedUser(_ userId: UUID, on game: AttendedGame) -> Bool {
         game.friends.contains { $0.resolvedLinkedUserId == userId }
+    }
+
+    @MainActor
+    @discardableResult
+    static func linkLocalCompanion(
+        named localName: String,
+        to profile: PublicUserProfile,
+        across games: [AttendedGame],
+        modelContext: ModelContext
+    ) -> Int {
+        let key = localName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !key.isEmpty else { return 0 }
+
+        let displayName: String = {
+            let display = profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !display.isEmpty { return display }
+            let username = profile.username.trimmingCharacters(in: .whitespacesAndNewlines)
+            return username.isEmpty ? localName : username
+        }()
+
+        var touched = 0
+        for game in games {
+            var entries = entries(from: game)
+            var changed = false
+            for index in entries.indices {
+                let entry = entries[index]
+                if entry.linkedUserId == profile.userId {
+                    if entry.name != displayName {
+                        entries[index].name = displayName
+                        changed = true
+                    }
+                    continue
+                }
+                guard entry.linkedUserId == nil,
+                      entry.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == key
+                else { continue }
+                entries[index] = DiaryFriendEntry(
+                    id: entry.id,
+                    name: displayName,
+                    linkedUserId: profile.userId
+                )
+                changed = true
+            }
+
+            // Legacy companions → structured friends with link.
+            if game.friends.isEmpty {
+                let tokens = GameLogFilter.companionTokens(in: game.companions)
+                if tokens.contains(where: { $0.lowercased() == key }) {
+                    entries = tokens.map { token in
+                        if token.lowercased() == key {
+                            return DiaryFriendEntry(name: displayName, linkedUserId: profile.userId)
+                        }
+                        return DiaryFriendEntry(name: token)
+                    }
+                    changed = true
+                }
+            }
+
+            guard changed else { continue }
+            // Avoid duplicate linked rows if the account was already tagged separately.
+            var seenLinked = Set<UUID>()
+            var seenNames = Set<String>()
+            entries = entries.compactMap { entry in
+                if let linked = entry.linkedUserId {
+                    guard seenLinked.insert(linked).inserted else { return nil }
+                } else {
+                    let nameKey = entry.name.lowercased()
+                    guard seenNames.insert(nameKey).inserted else { return nil }
+                }
+                return entry
+            }
+            setFriends(entries: entries, on: game, modelContext: modelContext)
+            touched += 1
+        }
+
+        if touched > 0 {
+            try? modelContext.save()
+        }
+        return touched
     }
 
     @MainActor

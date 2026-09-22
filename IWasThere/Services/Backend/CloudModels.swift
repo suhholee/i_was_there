@@ -57,6 +57,17 @@ struct CloudAttendedGameRow: Codable, Sendable, Identifiable {
     var note: String
     let awayTeamName: String?
     let homeTeamName: String?
+    let homeScore: Int?
+    let awayScore: Int?
+    let homeTeamId: Int?
+    let awayTeamId: Int?
+    let homeStarterName: String?
+    let awayStarterName: String?
+    let homeWon: Bool?
+    let awayWon: Bool?
+    let friendsVisibleToOthers: Bool?
+    let rootedForTeamId: Int?
+    let includeRootedTeamInWinRate: Bool?
     let invitedFromUserId: UUID?
     let createdAt: Date?
     var updatedAt: Date?
@@ -76,9 +87,72 @@ struct CloudAttendedGameRow: Codable, Sendable, Identifiable {
         case note
         case awayTeamName = "away_team_name"
         case homeTeamName = "home_team_name"
+        case homeScore = "home_score"
+        case awayScore = "away_score"
+        case homeTeamId = "home_team_id"
+        case awayTeamId = "away_team_id"
+        case homeStarterName = "home_starter_name"
+        case awayStarterName = "away_starter_name"
+        case homeWon = "home_won"
+        case awayWon = "away_won"
+        case friendsVisibleToOthers = "friends_visible_to_others"
+        case rootedForTeamId = "rooted_for_team_id"
+        case includeRootedTeamInWinRate = "include_rooted_team_in_win_rate"
         case invitedFromUserId = "invited_from_user_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+
+    /// True when friend-profile cards still need live API fill-in (or an owner re-sync).
+    var needsDisplaySnapshot: Bool {
+        homeScore == nil
+            || awayScore == nil
+            || homeTeamId == nil
+            || awayTeamId == nil
+    }
+
+    func withDisplaySnapshot(
+        homeScore: Int? = nil,
+        awayScore: Int? = nil,
+        homeTeamId: Int? = nil,
+        awayTeamId: Int? = nil,
+        homeStarterName: String? = nil,
+        awayStarterName: String? = nil,
+        homeWon: Bool? = nil,
+        awayWon: Bool? = nil,
+        awayTeamName: String? = nil,
+        homeTeamName: String? = nil
+    ) -> CloudAttendedGameRow {
+        CloudAttendedGameRow(
+            id: id,
+            userId: userId,
+            gameKey: gameKey,
+            league: league,
+            mlbGamePk: mlbGamePk,
+            kboGameId: kboGameId,
+            kboGDt: kboGDt,
+            officialDateString: officialDateString,
+            gameDate: gameDate,
+            season: season,
+            eventTitle: eventTitle,
+            note: note,
+            awayTeamName: awayTeamName ?? self.awayTeamName,
+            homeTeamName: homeTeamName ?? self.homeTeamName,
+            homeScore: homeScore ?? self.homeScore,
+            awayScore: awayScore ?? self.awayScore,
+            homeTeamId: homeTeamId ?? self.homeTeamId,
+            awayTeamId: awayTeamId ?? self.awayTeamId,
+            homeStarterName: homeStarterName ?? self.homeStarterName,
+            awayStarterName: awayStarterName ?? self.awayStarterName,
+            homeWon: homeWon ?? self.homeWon,
+            awayWon: awayWon ?? self.awayWon,
+            friendsVisibleToOthers: self.friendsVisibleToOthers,
+            rootedForTeamId: self.rootedForTeamId,
+            includeRootedTeamInWinRate: self.includeRootedTeamInWinRate,
+            invitedFromUserId: invitedFromUserId,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -170,6 +244,17 @@ struct CloudAttendedGameUpsert: Codable, Sendable {
     var note: String
     var awayTeamName: String
     var homeTeamName: String
+    var homeScore: Int
+    var awayScore: Int
+    var homeTeamId: Int
+    var awayTeamId: Int
+    var homeStarterName: String
+    var awayStarterName: String
+    var homeWon: Bool
+    var awayWon: Bool
+    var friendsVisibleToOthers: Bool
+    var rootedForTeamId: Int?
+    var includeRootedTeamInWinRate: Bool
     var updatedAt: String
 
     enum CodingKeys: String, CodingKey {
@@ -186,6 +271,17 @@ struct CloudAttendedGameUpsert: Codable, Sendable {
         case note
         case awayTeamName = "away_team_name"
         case homeTeamName = "home_team_name"
+        case homeScore = "home_score"
+        case awayScore = "away_score"
+        case homeTeamId = "home_team_id"
+        case awayTeamId = "away_team_id"
+        case homeStarterName = "home_starter_name"
+        case awayStarterName = "away_starter_name"
+        case homeWon = "home_won"
+        case awayWon = "away_won"
+        case friendsVisibleToOthers = "friends_visible_to_others"
+        case rootedForTeamId = "rooted_for_team_id"
+        case includeRootedTeamInWinRate = "include_rooted_team_in_win_rate"
         case updatedAt = "updated_at"
     }
 }
@@ -299,6 +395,17 @@ extension CloudAttendedGameUpsert {
             note: game.note,
             awayTeamName: game.awayTeamName,
             homeTeamName: game.homeTeamName,
+            homeScore: game.homeScore,
+            awayScore: game.awayScore,
+            homeTeamId: game.homeTeamID,
+            awayTeamId: game.awayTeamID,
+            homeStarterName: game.homeStarterName,
+            awayStarterName: game.awayStarterName,
+            homeWon: game.homeWon,
+            awayWon: game.awayWon,
+            friendsVisibleToOthers: game.friendsVisibleToOthers,
+            rootedForTeamId: game.rootedForTeamID,
+            includeRootedTeamInWinRate: game.includeRootedTeamInWinRate,
             updatedAt: CloudDateCodec.string(from: .now)
         )
     }

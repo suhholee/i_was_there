@@ -9,20 +9,20 @@ struct UserProfileView: View {
     @Query(sort: \AttendedGame.gameDate, order: .reverse) private var allGames: [AttendedGame]
     @Query private var localProfiles: [UserProfile]
     @State private var profile: PublicUserProfile?
-    @State private var games: [AttendedGame] = []
-    @State private var gameContainer: ModelContainer?
+    @State private var gameSummaries: [RemoteGameSummary] = []
     @State private var avatarImage: UIImage?
     @State private var isLoading = true
+    @State private var isLoadingGames = false
     @State private var errorMessage: String?
     @State private var isFollowActionLoading = false
     @State private var showUnfollowConfirmation = false
     @State private var enrichedPlayerPositions: [Int: String] = [:]
     @State private var gamesLeagueFilter: League = .mlb
 
-    private var filteredProfileGames: [AttendedGame] {
-        games
+    private var filteredProfileGames: [RemoteGameSummary] {
+        gameSummaries
             .filter { $0.resolvedLeague == gamesLeagueFilter }
-            .sorted { $0.gameDate > $1.gameDate }
+            .sorted { $0.row.gameDate > $1.row.gameDate }
     }
 
     var body: some View {
@@ -63,10 +63,6 @@ struct UserProfileView: View {
         }
         .refreshable {
             await loadProfile(forceRefresh: true, silent: true)
-        }
-        .onAppear {
-            guard profile != nil else { return }
-            Task { await loadProfile(forceRefresh: true, silent: true) }
         }
         .alert("Unfollow @\(profile?.username ?? "")?", isPresented: $showUnfollowConfirmation) {
             Button("Unfollow", role: .destructive) {
@@ -143,7 +139,7 @@ struct UserProfileView: View {
                     Spacer()
                     if count > 0 {
                         Button("View in Games") {
-                            openGamesTogether?(friend)
+                            openGamesTogether?(GameFriendFilterOption(friend: friend))
                         }
                         .font(.subheadline.weight(.semibold))
                     }
@@ -232,10 +228,10 @@ struct UserProfileView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(DesignTokens.surface)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            } else if isLoading {
+            } else if isLoadingGames && gameSummaries.isEmpty {
                 ProgressView()
                     .frame(maxWidth: .infinity)
-            } else if games.isEmpty {
+            } else if gameSummaries.isEmpty {
                 Text("No games logged yet.")
                     .font(.subheadline)
                     .foregroundStyle(DesignTokens.secondaryText)
@@ -243,17 +239,15 @@ struct UserProfileView: View {
                 Text("No \(gamesLeagueFilter.title) games logged yet.")
                     .font(.subheadline)
                     .foregroundStyle(DesignTokens.secondaryText)
-            } else if let gameContainer {
-                ForEach(filteredProfileGames) { game in
+            } else {
+                ForEach(filteredProfileGames) { summary in
                     NavigationLink {
-                        GameDetailView(
-                            game: game,
-                            isReadOnly: true,
-                            favoriteTeamIDOverride: profile.favoriteTeamID(for: game.resolvedLeague)
+                        RemoteGameDetailLoader(
+                            summary: summary,
+                            favoriteTeamID: profile.favoriteTeamID(for: summary.resolvedLeague)
                         )
-                        .modelContainer(gameContainer)
                     } label: {
-                        remoteGameCard(game, favoriteTeamID: profile.favoriteTeamID(for: game.resolvedLeague))
+                        remoteGameCard(summary, favoriteTeamID: profile.favoriteTeamID(for: summary.resolvedLeague))
                     }
                     .buttonStyle(.plain)
                 }
@@ -284,30 +278,38 @@ struct UserProfileView: View {
         .fixedSize(horizontal: true, vertical: false)
     }
 
-    private func remoteGameCard(_ game: AttendedGame, favoriteTeamID: Int?) -> some View {
+    private func remoteGameCard(_ summary: RemoteGameSummary, favoriteTeamID: Int?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
-                Text("\(game.awayTeamName) @ \(game.homeTeamName)")
+                Text(summary.matchupLabel)
                     .font(.headline)
                     .foregroundStyle(DesignTokens.cardPrimaryText)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 8)
-                FavoriteResultBadge(won: game.favoriteTeamWon(favoriteTeamID: favoriteTeamID))
+                FavoriteResultBadge(outcome: summary.favoriteTeamResult(favoriteTeamID: favoriteTeamID))
             }
-            Text("\(game.awayScore)–\(game.homeScore) · \(game.gameCardDateLabel)")
-                .font(.subheadline)
-                .foregroundStyle(DesignTokens.cardSecondaryText)
-                .monospacedDigit()
-            Text(game.startersLabel)
-                .font(.caption)
-                .foregroundStyle(DesignTokens.cardSecondaryText)
-            if !game.eventTitle.isEmpty {
-                Text(game.eventTitle)
+            if let score = summary.scoreLabel {
+                Text("\(score) · \(summary.dateLabel)")
+                    .font(.subheadline)
+                    .foregroundStyle(DesignTokens.cardSecondaryText)
+                    .monospacedDigit()
+            } else {
+                Text(summary.dateLabel)
+                    .font(.subheadline)
+                    .foregroundStyle(DesignTokens.cardSecondaryText)
+            }
+            if !summary.startersLabel.isEmpty {
+                Text(summary.startersLabel)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.cardSecondaryText)
+            }
+            if !summary.row.eventTitle.isEmpty {
+                Text(summary.row.eventTitle)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(DesignTokens.accent)
             }
-            if !game.friendsLabel.isEmpty {
-                Text("w/ \(game.friendsLabel)")
+            if !summary.friendsLabel.isEmpty {
+                Text("w/ \(summary.friendsLabel)")
                     .font(.caption)
                     .foregroundStyle(DesignTokens.cardSecondaryText)
             }
@@ -364,8 +366,7 @@ struct UserProfileView: View {
             enrichedPlayerPositions = [:]
         }
         if !silent {
-            games = []
-            gameContainer = nil
+            gameSummaries = []
             gamesLeagueFilter = .mlb
         }
         defer {
@@ -378,24 +379,30 @@ struct UserProfileView: View {
             guard let loaded = try await SocialProfileService.shared.fetchProfile(userId: userId) else {
                 errorMessage = "This profile could not be found."
                 profile = nil
-                games = []
-                gameContainer = nil
+                gameSummaries = []
                 avatarImage = nil
                 return
             }
             profile = loaded
             gamesLeagueFilter = loaded.league
-            avatarImage = await SocialProfileService.shared.downloadAvatar(
+            if !silent {
+                isLoading = false
+            }
+
+            async let avatarTask = SocialProfileService.shared.downloadAvatar(
                 path: loaded.avatarStoragePath,
                 forceRefresh: forceRefresh
             )
-            await enrichFavoritePlayerPositions(for: loaded)
-            try await loadGamesIfNeeded(for: loaded, forceRefresh: forceRefresh)
+            async let positionsTask: Void = enrichFavoritePlayerPositions(for: loaded)
+            async let gamesTask: Void = loadGamesIfNeeded(for: loaded, forceRefresh: forceRefresh)
+
+            avatarImage = await avatarTask
+            await positionsTask
+            try await gamesTask
         } catch {
             if !silent {
                 profile = nil
-                games = []
-                gameContainer = nil
+                gameSummaries = []
                 avatarImage = nil
             }
             errorMessage = error.localizedDescription
@@ -405,27 +412,48 @@ struct UserProfileView: View {
     @MainActor
     private func loadGamesIfNeeded(for loaded: PublicUserProfile, forceRefresh: Bool = false) async throws {
         guard loaded.canViewGames else {
-            games = []
-            gameContainer = nil
+            gameSummaries = []
             return
         }
 
-        if forceRefresh {
-            gameContainer = nil
+        if !forceRefresh, !gameSummaries.isEmpty {
+            return
         }
 
-        let container: ModelContainer
-        if let gameContainer {
-            container = gameContainer
-        } else {
-            container = try EphemeralModelContainer.make()
-            gameContainer = container
+        isLoadingGames = true
+        do {
+            // 1) Paint games (+ scores/starters from Supabase) as soon as rows arrive.
+            var summaries = try await SocialProfileService.shared.loadVisibleGameSummaries(for: loaded)
+            gameSummaries = summaries
+            isLoadingGames = false
+
+            // 2) Friend names + hybrid fill-in only for rows still missing a snapshot.
+            async let withFriends = SocialProfileService.shared.attachFriendNames(
+                to: summaries,
+                profileUserId: loaded.userId
+            )
+            async let enriched = SocialProfileService.shared.enrichMissingDisplaySnapshots(summaries)
+
+            let friendsAttached = await withFriends
+            let snapshotFilled = await enriched
+
+            guard !Task.isCancelled else { return }
+
+            // Merge: prefer enriched display fields, keep friend names from attach step.
+            let enrichedById = Dictionary(uniqueKeysWithValues: snapshotFilled.map { ($0.id, $0) })
+            summaries = friendsAttached.map { summary in
+                guard let filled = enrichedById[summary.id] else { return summary }
+                return RemoteGameSummary(
+                    id: summary.id,
+                    row: filled.row,
+                    friendNames: summary.friendNames
+                )
+            }
+            gameSummaries = summaries
+        } catch {
+            isLoadingGames = false
+            throw error
         }
-        let context = ModelContext(container)
-        games = try await SocialProfileService.shared.loadVisibleGames(
-            for: loaded,
-            modelContext: context
-        )
     }
 
     @MainActor
@@ -504,6 +532,66 @@ struct UserProfileView: View {
                     TeamLogoImage(teamID: kboID, size: 28)
                 }
             }
+        }
+    }
+}
+
+/// Hydrates one remote game on demand when opened from a People profile.
+struct RemoteGameDetailLoader: View {
+    let summary: RemoteGameSummary
+    let favoriteTeamID: Int?
+
+    @State private var container: ModelContainer?
+    @State private var game: AttendedGame?
+    @State private var errorMessage: String?
+    @State private var isLoading = true
+
+    var body: some View {
+        ZStack {
+            DesignTokens.background.ignoresSafeArea()
+
+            if let game, let container {
+                GameDetailView(
+                    game: game,
+                    isReadOnly: true,
+                    favoriteTeamIDOverride: favoriteTeamID
+                )
+                .modelContainer(container)
+            } else if let errorMessage {
+                ContentUnavailableView(
+                    "Couldn't load game",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(errorMessage)
+                )
+            } else {
+                ProgressView("Loading game…")
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: summary.id) {
+            await load()
+        }
+    }
+
+    @MainActor
+    private func load() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let container = try EphemeralModelContainer.make()
+            let context = ModelContext(container)
+            let hydrated = try await SocialProfileService.shared.loadVisibleGameDetail(
+                summary: summary,
+                modelContext: context
+            )
+            self.container = container
+            self.game = hydrated
+        } catch {
+            errorMessage = error.localizedDescription
+            game = nil
+            container = nil
         }
     }
 }

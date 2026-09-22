@@ -20,7 +20,8 @@ It can cover the core loop (pick date → finished game → player lines → sta
 | Need | Endpoint | Status |
 |------|----------|--------|
 | Schedule by date | `Game?season={yyyy}&gDt={yyyyMMdd}` | ✅ |
-| Team W/L for game | `GameTeamRecord?season=&gDt=` | ✅ `result_sc` W/L/D |
+| Team W/L/D for game | `GameTeamRecord?season=&gDt=` | ✅ `result_sc` W/L/D (regular-season draws) |
+| Doubleheaders | same `gDt` + same `a_t_id`/`h_t_id` | ✅ distinct `g_id` suffixes (`…0`/`…1` or `…1`/`…2`) |
 | Starters | `GameStartPitcherRecord?season=&gDt=` | ✅ `t_pit_p_id` / `b_pit_p_id` |
 | Batter game lines | `GameHitterBoxScore?season=&gDt=` | ✅ filter client-side by `g_id` |
 | Pitcher game lines | `GamePitcherBoxScore?season=&gDt=` | ✅ filter by `g_id` |

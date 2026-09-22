@@ -14,6 +14,8 @@ enum DesignTokens {
     static let favoriteStar = Color(red: 1.0, green: 0.82, blue: 0.20)
     static let winGreen = Color(red: 0.12, green: 0.62, blue: 0.32)
     static let loseRed = Color(red: 0.82, green: 0.16, blue: 0.20)
+    /// Neutral draw / tie (KBO regular season).
+    static let drawAmber = Color(red: 0.72, green: 0.55, blue: 0.12)
     /// Text on dark page background.
     static let primaryText = Color.white
     static let secondaryText = Color.white.opacity(0.65)

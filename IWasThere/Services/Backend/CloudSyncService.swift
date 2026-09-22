@@ -26,10 +26,22 @@ final class CloudSyncService {
             if priorUserId != userId {
                 LocalUserDataStore.clearUserData(modelContext: modelContext)
                 try await pullAndHydrate(client: client, modelContext: modelContext, userId: userId)
+                try await backfillDisplaySnapshotsIfNeeded(
+                    client: client,
+                    modelContext: modelContext,
+                    userId: userId,
+                    force: true
+                )
             } else {
                 try await pushProfile(client: client, modelContext: modelContext, userId: userId)
                 try await pushAllGames(client: client, modelContext: modelContext, userId: userId)
                 try await pullAndHydrate(client: client, modelContext: modelContext, userId: userId)
+                try await backfillDisplaySnapshotsIfNeeded(
+                    client: client,
+                    modelContext: modelContext,
+                    userId: userId,
+                    force: false
+                )
             }
             LocalUserDataStore.markSyncedUserId(userId)
         } catch {
@@ -165,6 +177,20 @@ final class CloudSyncService {
         }
     }
 
+    /// Re-pushes local games so `attended_games` gets scores / starters / team ids (migration 017).
+    private func backfillDisplaySnapshotsIfNeeded(
+        client: SupabaseClient,
+        modelContext: ModelContext,
+        userId: UUID,
+        force: Bool
+    ) async throws {
+        if !force, LocalUserDataStore.hasBackfilledDisplaySnapshots(for: userId) {
+            return
+        }
+        try await pushAllGames(client: client, modelContext: modelContext, userId: userId)
+        LocalUserDataStore.markDisplaySnapshotsBackfilled(for: userId)
+    }
+
     // MARK: - Pull + hydrate
 
     private func pullAndHydrate(
@@ -208,6 +234,9 @@ final class CloudSyncService {
                 if let local = localGames.first(where: { $0.gameKey == row.gameKey }) {
                     local.eventTitle = row.eventTitle
                     local.note = row.note
+                    local.friendsVisibleToOthers = row.friendsVisibleToOthers ?? true
+                    local.rootedForTeamID = row.rootedForTeamId
+                    local.includeRootedTeamInWinRate = row.includeRootedTeamInWinRate ?? false
                     if let invitedFrom = row.invitedFromUserId {
                         local.invitedFromUserId = invitedFrom.uuidString
                     }
