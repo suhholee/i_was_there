@@ -23,4 +23,6 @@ Scripts/kbo_spike/help_*.html
 
 # Supabase secrets (copy from SupabaseConfig.example.plist)
 IWasThere/Config/SupabaseConfig.plist
-supabase/.temp/
+
+# Local Supabase migrations / CLI (kept on device, not in git)
+supabase/
