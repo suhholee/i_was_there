@@ -1,16 +1,18 @@
 import SwiftUI
 
-/// Green WIN / red LOSE when the favorite team played this game.
+/// Green WIN / red LOSE / amber DRAW when the favorite (or rooted-for) team played this game.
 struct FavoriteResultBadge: View {
-    let won: Bool?
+    let outcome: AttendanceOutcome?
     var compact: Bool = true
 
     var body: some View {
-        switch won {
-        case true:
+        switch outcome {
+        case .win:
             badge(text: "WIN", color: DesignTokens.winGreen)
-        case false:
+        case .lose:
             badge(text: "LOSE", color: DesignTokens.loseRed)
+        case .draw:
+            badge(text: "DRAW", color: DesignTokens.drawAmber)
         case nil:
             EmptyView()
         }

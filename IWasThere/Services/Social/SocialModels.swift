@@ -152,11 +152,121 @@ struct RemoteGameFriendRow: Codable, Sendable {
     let name: String
 }
 
+struct RemoteGameFriendNameRow: Codable, Sendable {
+    let gameId: UUID
+    let name: String
+
+    enum CodingKeys: String, CodingKey {
+        case gameId = "game_id"
+        case name
+    }
+}
+
 struct RemoteGamePhotoRow: Codable, Sendable {
     let storagePath: String
 
     enum CodingKeys: String, CodingKey {
         case storagePath = "storage_path"
+    }
+}
+
+/// Cloud-backed game card for People profiles — no live MLB/KBO hydration.
+struct RemoteGameSummary: Identifiable, Sendable {
+    let id: UUID
+    let row: CloudAttendedGameRow
+    let friendNames: [String]
+
+    var resolvedLeague: League {
+        League(rawValue: row.league) ?? .mlb
+    }
+
+    var awayTeamName: String {
+        (row.awayTeamName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var homeTeamName: String {
+        (row.homeTeamName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var matchupLabel: String {
+        let away = awayTeamName.isEmpty ? "Away" : awayTeamName
+        let home = homeTeamName.isEmpty ? "Home" : homeTeamName
+        return "\(away) @ \(home)"
+    }
+
+    var hasScoreSnapshot: Bool {
+        row.homeScore != nil && row.awayScore != nil
+    }
+
+    var needsEnrichment: Bool {
+        row.needsDisplaySnapshot
+    }
+
+    func applying(row updated: CloudAttendedGameRow) -> RemoteGameSummary {
+        RemoteGameSummary(id: id, row: updated, friendNames: friendNames)
+    }
+
+    var scoreLabel: String? {
+        guard let home = row.homeScore, let away = row.awayScore else { return nil }
+        return "\(away)–\(home)"
+    }
+
+    var startersLabel: String {
+        let away = (row.awayStarterName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let home = (row.homeStarterName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !away.isEmpty || !home.isEmpty else { return "" }
+        let awayPart = away.isEmpty ? "—" : shortPitcherName(away)
+        let homePart = home.isEmpty ? "—" : shortPitcherName(home)
+        return "\(awayPart) vs \(homePart)"
+    }
+
+    var friendsLabel: String {
+        friendNames.joined(separator: ", ")
+    }
+
+    var dateLabel: String {
+        if let day = MLBDateParsing.calendarDate(
+            fromOfficial: row.officialDateString.isEmpty ? nil : row.officialDateString
+        ) {
+            return day.formatted(date: .abbreviated, time: .omitted)
+        }
+        return row.gameDate.formatted(date: .abbreviated, time: .omitted)
+    }
+
+    func favoriteTeamResult(favoriteTeamID: Int?) -> AttendanceOutcome? {
+        guard let favoriteTeamID else { return nil }
+        guard let homeID = row.homeTeamId, let awayID = row.awayTeamId else { return nil }
+        guard homeID == favoriteTeamID || awayID == favoriteTeamID else { return nil }
+
+        let homeWonFlag = row.homeWon
+        let awayWonFlag = row.awayWon
+        if let homeWonFlag, let awayWonFlag, !homeWonFlag && !awayWonFlag {
+            return .draw
+        }
+        if let home = row.homeScore, let away = row.awayScore, home == away,
+           homeWonFlag != true, awayWonFlag != true {
+            return .draw
+        }
+
+        if homeID == favoriteTeamID {
+            if let homeWonFlag { return homeWonFlag ? .win : .lose }
+            guard let home = row.homeScore, let away = row.awayScore else { return nil }
+            if home == away { return .draw }
+            return home > away ? .win : .lose
+        }
+        if let awayWonFlag { return awayWonFlag ? .win : .lose }
+        guard let home = row.homeScore, let away = row.awayScore else { return nil }
+        if home == away { return .draw }
+        return away > home ? .win : .lose
+    }
+
+    private func shortPitcherName(_ full: String) -> String {
+        let parts = full.split(separator: " ")
+        guard let last = parts.last else { return full }
+        if parts.count >= 2, let first = parts.first?.first {
+            return "\(first). \(last)"
+        }
+        return String(last)
     }
 }
 

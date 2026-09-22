@@ -24,6 +24,13 @@ enum ProfileVisibility: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+/// Result relative to a tracked team (favorite or rooted-for). Draws occur in KBO regular season.
+enum AttendanceOutcome: Equatable {
+    case win
+    case lose
+    case draw
+}
+
 @Model
 final class UserProfile {
     var displayName: String
@@ -287,6 +294,12 @@ final class AttendedGame {
     var note: String = ""
     /// Set when this diary was created by accepting a game share invite (inviter's user id).
     var invitedFromUserId: String = ""
+    /// When false, companions on this game are hidden from other users' profile views.
+    var friendsVisibleToOthers: Bool = true
+    /// Team the user rooted for when their favorite club wasn't playing.
+    var rootedForTeamID: Int?
+    /// When true, `rootedForTeamID` counts toward attendance win rate / W–L filters.
+    var includeRootedTeamInWinRate: Bool = false
     var createdAt: Date = Date()
 
     @Relationship(deleteRule: .cascade, inverse: \GamePlayerStat.game)
@@ -432,12 +445,49 @@ final class AttendedGame {
         return "\(dateText) · \(timeText)"
     }
 
-    /// Whether the user's favorite team won this attended game (Phase 3 Home W%).
-    func favoriteTeamWon(favoriteTeamID: Int?) -> Bool? {
+    /// Tie game (both sides not winners) — common in KBO regular season.
+    var isDraw: Bool {
+        !homeWon && !awayWon
+    }
+
+    /// Outcome for the user's favorite team (nil if they didn't play).
+    func favoriteTeamResult(favoriteTeamID: Int?) -> AttendanceOutcome? {
         guard let favoriteTeamID else { return nil }
-        if homeTeamID == favoriteTeamID { return homeWon }
-        if awayTeamID == favoriteTeamID { return awayWon }
-        return nil
+        guard homeTeamID == favoriteTeamID || awayTeamID == favoriteTeamID else { return nil }
+        if isDraw { return .draw }
+        if homeTeamID == favoriteTeamID { return homeWon ? .win : .lose }
+        return awayWon ? .win : .lose
+    }
+
+    /// Outcome for the selected rooted-for team (when favorite wasn't playing).
+    func rootedTeamResult() -> AttendanceOutcome? {
+        guard let rootedForTeamID else { return nil }
+        guard homeTeamID == rootedForTeamID || awayTeamID == rootedForTeamID else { return nil }
+        if isDraw { return .draw }
+        if homeTeamID == rootedForTeamID { return homeWon ? .win : .lose }
+        return awayWon ? .win : .lose
+    }
+
+    /// Result for W% / filters: favorite if they played, else rooted-for when opted in.
+    func attendanceResult(favoriteTeamID: Int?) -> AttendanceOutcome? {
+        if let result = favoriteTeamResult(favoriteTeamID: favoriteTeamID) {
+            return result
+        }
+        guard includeRootedTeamInWinRate else { return nil }
+        return rootedTeamResult()
+    }
+
+    /// Badge display: favorite result if present, otherwise rooted-for (even if not in W%).
+    func displayResult(favoriteTeamID: Int?) -> AttendanceOutcome? {
+        if let result = favoriteTeamResult(favoriteTeamID: favoriteTeamID) {
+            return result
+        }
+        return rootedTeamResult()
+    }
+
+    func involvesFavoriteTeam(favoriteTeamID: Int?) -> Bool {
+        guard let favoriteTeamID else { return false }
+        return homeTeamID == favoriteTeamID || awayTeamID == favoriteTeamID
     }
 
     /// Winning club’s MLB team ID; `nil` for ties / unknown.

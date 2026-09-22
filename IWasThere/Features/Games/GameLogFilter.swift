@@ -43,6 +43,49 @@ struct RankedMutualFriend: Identifiable, Sendable {
     var id: UUID { friend.userId }
 }
 
+struct RankedLocalCompanion: Identifiable, Sendable {
+    let name: String
+    let gamesTogether: Int
+    let togetherAttendance: LeaderboardEngine.AttendanceRecord
+
+    var id: String { "local:\(name.lowercased())" }
+}
+
+enum PeopleRankItem: Identifiable, Sendable {
+    case account(RankedMutualFriend)
+    case localCompanion(RankedLocalCompanion)
+
+    var id: String {
+        switch self {
+        case .account(let ranked): ranked.friend.userId.uuidString
+        case .localCompanion(let ranked): ranked.id
+        }
+    }
+
+    var gamesTogether: Int {
+        switch self {
+        case .account(let ranked): ranked.gamesTogether
+        case .localCompanion(let ranked): ranked.gamesTogether
+        }
+    }
+
+    var togetherAttendance: LeaderboardEngine.AttendanceRecord {
+        switch self {
+        case .account(let ranked): ranked.togetherAttendance
+        case .localCompanion(let ranked): ranked.togetherAttendance
+        }
+    }
+
+    var sortName: String {
+        switch self {
+        case .account(let ranked):
+            ranked.friend.displayName.isEmpty ? ranked.friend.username : ranked.friend.displayName
+        case .localCompanion(let ranked):
+            ranked.name
+        }
+    }
+}
+
 enum FriendListRankMode: String, CaseIterable, Identifiable {
     case gamesTogether
     case winRate
@@ -71,9 +114,19 @@ enum FriendRankMedal: Int {
         case .bronze: (0.8, 0.5, 0.2)
         }
     }
+}
 
-    static func forRank(_ rank: Int) -> FriendRankMedal? {
-        FriendRankMedal(rawValue: rank)
+/// Display rank for People list: shared medals for ties on 1–3, numbers from 4 up.
+enum FriendRankBadge: Equatable, Sendable {
+    case medal(FriendRankMedal)
+    case number(Int)
+
+    static func forCompetitionRank(_ rank: Int) -> FriendRankBadge? {
+        guard rank > 0 else { return nil }
+        if let medal = FriendRankMedal(rawValue: rank) {
+            return .medal(medal)
+        }
+        return .number(rank)
     }
 }
 
@@ -97,6 +150,7 @@ enum FavoriteResultFilter: String, CaseIterable, Identifiable {
     case all
     case wins
     case losses
+    case draws
 
     var id: String { rawValue }
 
@@ -105,6 +159,7 @@ enum FavoriteResultFilter: String, CaseIterable, Identifiable {
         case .all: "All results"
         case .wins: "My team W"
         case .losses: "My team L"
+        case .draws: "My team D"
         }
     }
 }
@@ -246,32 +301,192 @@ enum GameLogFilter {
                 )
             }
             .sorted { lhs, rhs in
-                switch mode {
-                case .gamesTogether:
-                    if lhs.gamesTogether != rhs.gamesTogether {
-                        return lhs.gamesTogether > rhs.gamesTogether
-                    }
-                case .winRate:
-                    let leftPct = lhs.togetherAttendance.winPercentage
-                    let rightPct = rhs.togetherAttendance.winPercentage
-                    switch (leftPct, rightPct) {
-                    case let (left?, right?) where left != right:
-                        return left > right
-                    case (nil, .some):
-                        return false
-                    case (.some, nil):
-                        return true
-                    default:
-                        if lhs.togetherAttendance.games != rhs.togetherAttendance.games {
-                            return lhs.togetherAttendance.games > rhs.togetherAttendance.games
-                        }
-                        if lhs.gamesTogether != rhs.gamesTogether {
-                            return lhs.gamesTogether > rhs.gamesTogether
-                        }
+                compareRank(
+                    mode: mode,
+                    leftGames: lhs.gamesTogether,
+                    rightGames: rhs.gamesTogether,
+                    leftAttendance: lhs.togetherAttendance,
+                    rightAttendance: rhs.togetherAttendance,
+                    leftName: friendName(lhs.friend),
+                    rightName: friendName(rhs.friend)
+                )
+            }
+    }
+
+    /// Mutual accounts + local diary companions (no linked account) for People ranking.
+    static func rankPeople(
+        mutualFriends: [UserSearchResult],
+        games: [AttendedGame],
+        mlbFavoriteTeamID: Int?,
+        kboFavoriteTeamID: Int?,
+        mode: FriendListRankMode
+    ) -> [PeopleRankItem] {
+        let accounts = rankMutualFriends(
+            mutualFriends,
+            games: games,
+            mlbFavoriteTeamID: mlbFavoriteTeamID,
+            kboFavoriteTeamID: kboFavoriteTeamID,
+            mode: mode
+        ).map(PeopleRankItem.account)
+
+        var coveredKeys = Set<String>()
+        for friend in mutualFriends {
+            coveredKeys.insert(friend.username.lowercased())
+            coveredKeys.insert("@\(friend.username)".lowercased())
+            let display = friend.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !display.isEmpty {
+                coveredKeys.insert(display.lowercased())
+            }
+        }
+
+        var localCounts: [String: (displayName: String, games: [AttendedGame])] = [:]
+        for game in games {
+            for friend in game.friends {
+                if friend.resolvedLinkedUserId != nil { continue }
+                let name = friend.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !name.isEmpty else { continue }
+                let key = name.lowercased()
+                guard !coveredKeys.contains(key) else { continue }
+                if var existing = localCounts[key] {
+                    existing.games.append(game)
+                    localCounts[key] = existing
+                } else {
+                    localCounts[key] = (displayName: name, games: [game])
+                }
+            }
+            // Legacy companions text when structured friends are empty.
+            if game.friends.isEmpty {
+                for name in companionTokens(in: game.companions) {
+                    let key = name.lowercased()
+                    guard !coveredKeys.contains(key) else { continue }
+                    if var existing = localCounts[key] {
+                        existing.games.append(game)
+                        localCounts[key] = existing
+                    } else {
+                        localCounts[key] = (displayName: name, games: [game])
                     }
                 }
-                return friendName(lhs.friend).localizedCaseInsensitiveCompare(friendName(rhs.friend)) == .orderedAscending
             }
+        }
+
+        let locals: [PeopleRankItem] = localCounts.values.map { entry in
+            let uniqueGames = Array(Dictionary(uniqueKeysWithValues: entry.games.map { ($0.persistentModelID, $0) }).values)
+            return .localCompanion(
+                RankedLocalCompanion(
+                    name: entry.displayName,
+                    gamesTogether: uniqueGames.count,
+                    togetherAttendance: LeaderboardEngine.favoriteAttendanceTogether(
+                        games: uniqueGames,
+                        mlbFavoriteTeamID: mlbFavoriteTeamID,
+                        kboFavoriteTeamID: kboFavoriteTeamID
+                    )
+                )
+            )
+        }
+
+        return (accounts + locals).sorted { lhs, rhs in
+            compareRank(
+                mode: mode,
+                leftGames: lhs.gamesTogether,
+                rightGames: rhs.gamesTogether,
+                leftAttendance: lhs.togetherAttendance,
+                rightAttendance: rhs.togetherAttendance,
+                leftName: lhs.sortName,
+                rightName: rhs.sortName
+            )
+        }
+    }
+
+    static func gamesTogether(withLocalCompanionName name: String, in games: [AttendedGame]) -> [AttendedGame] {
+        let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !key.isEmpty else { return [] }
+        return games.filter { game in
+            if game.friends.contains(where: {
+                $0.resolvedLinkedUserId == nil
+                    && $0.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == key
+            }) {
+                return true
+            }
+            if game.friends.isEmpty {
+                return companionTokens(in: game.companions).contains {
+                    $0.lowercased() == key
+                }
+            }
+            return false
+        }
+    }
+
+    /// Competition ranks for an already-sorted People list (ties share a rank; next skips ahead).
+    static func competitionRanks(for items: [PeopleRankItem], mode: FriendListRankMode) -> [Int] {
+        guard !items.isEmpty else { return [] }
+        var ranks: [Int] = []
+        ranks.reserveCapacity(items.count)
+        for index in items.indices {
+            if index > 0, rankMetricsEqual(items[index - 1], items[index], mode: mode) {
+                ranks.append(ranks[index - 1])
+            } else {
+                ranks.append(index + 1)
+            }
+        }
+        return ranks
+    }
+
+    private static func rankMetricsEqual(
+        _ lhs: PeopleRankItem,
+        _ rhs: PeopleRankItem,
+        mode: FriendListRankMode
+    ) -> Bool {
+        switch mode {
+        case .gamesTogether:
+            return lhs.gamesTogether == rhs.gamesTogether
+        case .winRate:
+            let left = lhs.togetherAttendance
+            let right = rhs.togetherAttendance
+            switch (left.winPercentage, right.winPercentage) {
+            case let (l?, r?):
+                return abs(l - r) < 0.000_001 && left.games == right.games
+            case (nil, nil):
+                return left.games == right.games && lhs.gamesTogether == rhs.gamesTogether
+            default:
+                return false
+            }
+        }
+    }
+
+    private static func compareRank(
+        mode: FriendListRankMode,
+        leftGames: Int,
+        rightGames: Int,
+        leftAttendance: LeaderboardEngine.AttendanceRecord,
+        rightAttendance: LeaderboardEngine.AttendanceRecord,
+        leftName: String,
+        rightName: String
+    ) -> Bool {
+        switch mode {
+        case .gamesTogether:
+            if leftGames != rightGames {
+                return leftGames > rightGames
+            }
+        case .winRate:
+            let leftPct = leftAttendance.winPercentage
+            let rightPct = rightAttendance.winPercentage
+            switch (leftPct, rightPct) {
+            case let (left?, right?) where left != right:
+                return left > right
+            case (nil, .some):
+                return false
+            case (.some, nil):
+                return true
+            default:
+                if leftAttendance.games != rightAttendance.games {
+                    return leftAttendance.games > rightAttendance.games
+                }
+                if leftGames != rightGames {
+                    return leftGames > rightGames
+                }
+            }
+        }
+        return leftName.localizedCaseInsensitiveCompare(rightName) == .orderedAscending
     }
 
     private static func friendName(_ friend: UserSearchResult) -> String {
@@ -324,8 +539,9 @@ enum GameLogFilter {
     ) -> Bool {
         switch filter {
         case .all: return true
-        case .wins: return game.favoriteTeamWon(favoriteTeamID: favoriteTeamID) == true
-        case .losses: return game.favoriteTeamWon(favoriteTeamID: favoriteTeamID) == false
+        case .wins: return game.attendanceResult(favoriteTeamID: favoriteTeamID) == .win
+        case .losses: return game.attendanceResult(favoriteTeamID: favoriteTeamID) == .lose
+        case .draws: return game.attendanceResult(favoriteTeamID: favoriteTeamID) == .draw
         }
     }
 

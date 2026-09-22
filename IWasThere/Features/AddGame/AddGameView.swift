@@ -272,7 +272,7 @@ struct AddGameView: View {
                             selected: viewModel.selectedKBOGame?.gameID == game.gameID,
                             alreadyLogged: alreadyLogged,
                             matchup: game.matchupLabel,
-                            detail: game.isFinal ? "Final" : "Not final",
+                            detail: kboMatchDetail(for: game),
                             venue: nil,
                             isFinal: game.isFinal
                         )
@@ -293,6 +293,14 @@ struct AddGameView: View {
         )
         .foregroundStyle(DesignTokens.primaryText)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func kboMatchDetail(for game: KBOScheduleGame) -> String {
+        let status = game.isFinal ? "Final" : "Not final"
+        if let number = game.doubleheaderGameNumber {
+            return "Doubleheader · Game \(number) · \(status)"
+        }
+        return status
     }
 
     private func matchRow(
@@ -361,6 +369,8 @@ struct AddGameView: View {
 
                 diaryField(title: "Event/Giveaway", text: $viewModel.eventTitle)
                 FriendEditorView(friends: $viewModel.friendEntries, appearance: .addGameDiary)
+                friendsVisibilityToggle
+                rootedForPicker
                 diaryField(title: "Notes", text: $viewModel.note)
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -437,6 +447,99 @@ struct AddGameView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .lineLimit(3...6)
         }
+    }
+
+    private var friendsVisibilityToggle: some View {
+        Toggle(isOn: $viewModel.friendsVisibleToOthers) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Show friends to others")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DesignTokens.primaryText)
+                Text("When off, people who view this game on your profile won’t see who you went with.")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.secondaryText)
+            }
+        }
+        .tint(DesignTokens.accent)
+        .padding(12)
+        .background(DesignTokens.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var rootedForPicker: some View {
+        let favoriteID = profiles.first?.favoriteTeamID(for: viewModel.league)
+        if !viewModel.involvesFavoriteTeam(favoriteTeamID: favoriteID),
+           let awayID = viewModel.selectedAwayTeamID,
+           let homeID = viewModel.selectedHomeTeamID,
+           let awayName = viewModel.selectedAwayTeamName,
+           let homeName = viewModel.selectedHomeTeamName {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Who did you root for?")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DesignTokens.primaryText)
+                Text("Your favorite team wasn’t in this game. Optionally count that side in your win rate.")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.secondaryText)
+
+                HStack(spacing: 8) {
+                    addGameRootedButton(teamID: awayID, title: awayName)
+                    addGameRootedButton(teamID: homeID, title: homeName)
+                }
+
+                if viewModel.rootedForTeamID != nil {
+                    Button("Clear selection") {
+                        viewModel.rootedForTeamID = nil
+                        viewModel.includeRootedTeamInWinRate = false
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DesignTokens.secondaryText)
+
+                    Toggle(isOn: $viewModel.includeRootedTeamInWinRate) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Include in win rate")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(DesignTokens.primaryText)
+                            Text("Count toward My team W/L.")
+                                .font(.caption)
+                                .foregroundStyle(DesignTokens.secondaryText)
+                        }
+                    }
+                    .tint(DesignTokens.accent)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DesignTokens.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+    }
+
+    private func addGameRootedButton(teamID: Int, title: String) -> some View {
+        let selected = viewModel.rootedForTeamID == teamID
+        return Button {
+            if selected {
+                viewModel.rootedForTeamID = nil
+                viewModel.includeRootedTeamInWinRate = false
+            } else {
+                viewModel.rootedForTeamID = teamID
+            }
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(selected ? DesignTokens.primaryText : DesignTokens.secondaryText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 8)
+                .background(selected ? DesignTokens.accent.opacity(0.28) : DesignTokens.background.opacity(0.45))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(selected ? DesignTokens.accent : Color.clear, lineWidth: 1.5)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     private var canContinueToDiary: Bool {

@@ -14,6 +14,9 @@ final class AddGameViewModel: ObservableObject {
     @Published var selectedKBOGame: KBOScheduleGame?
     @Published var eventTitle: String = ""
     @Published var friendEntries: [DiaryFriendEntry] = []
+    @Published var friendsVisibleToOthers: Bool = true
+    @Published var rootedForTeamID: Int?
+    @Published var includeRootedTeamInWinRate: Bool = false
     @Published var note: String = ""
     @Published var photoItems: [PhotosPickerItem] = []
     @Published var isLoading = false
@@ -48,6 +51,41 @@ final class AddGameViewModel: ObservableObject {
         case .mlb: selectedMLBGame?.matchupLabel
         case .kbo: selectedKBOGame?.matchupLabel
         }
+    }
+
+    var selectedAwayTeamID: Int? {
+        switch league {
+        case .mlb: selectedMLBGame?.teams.away.team.id
+        case .kbo: selectedKBOGame?.awayTeam.id
+        }
+    }
+
+    var selectedHomeTeamID: Int? {
+        switch league {
+        case .mlb: selectedMLBGame?.teams.home.team.id
+        case .kbo: selectedKBOGame?.homeTeam.id
+        }
+    }
+
+    var selectedAwayTeamName: String? {
+        switch league {
+        case .mlb: selectedMLBGame?.teams.away.team.name
+        case .kbo: selectedKBOGame?.awayTeam.name
+        }
+    }
+
+    var selectedHomeTeamName: String? {
+        switch league {
+        case .mlb: selectedMLBGame?.teams.home.team.name
+        case .kbo: selectedKBOGame?.homeTeam.name
+        }
+    }
+
+    func involvesFavoriteTeam(favoriteTeamID: Int?) -> Bool {
+        guard let favoriteTeamID,
+              let away = selectedAwayTeamID,
+              let home = selectedHomeTeamID else { return false }
+        return away == favoriteTeamID || home == favoriteTeamID
     }
 
     var canContinueToDiary: Bool {
@@ -116,6 +154,8 @@ final class AddGameViewModel: ObservableObject {
                 return
             }
         }
+        rootedForTeamID = nil
+        includeRootedTeamInWinRate = false
         step = .diary
     }
 
@@ -164,6 +204,9 @@ final class AddGameViewModel: ObservableObject {
 
             attended.eventTitle = eventTitle.trimmingCharacters(in: .whitespacesAndNewlines)
             attended.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            attended.friendsVisibleToOthers = friendsVisibleToOthers
+            attended.rootedForTeamID = rootedForTeamID
+            attended.includeRootedTeamInWinRate = rootedForTeamID != nil && includeRootedTeamInWinRate
 
             modelContext.insert(attended)
             for stat in attended.playerStats {

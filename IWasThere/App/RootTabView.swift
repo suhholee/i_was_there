@@ -51,7 +51,7 @@ struct RootTabView: View {
             .tag(AppTab.settings)
         }
         .environment(\.teamTheme, teamTheme)
-        .environment(\.openGamesTogether, { friend in openGamesTogether(with: friend) })
+        .environment(\.openGamesTogether, { filter in openGamesTogether(filter) })
         .tint(DesignTokens.primaryText)
         .preferredColorScheme(.dark)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -119,18 +119,22 @@ struct RootTabView: View {
         }
     }
 
-    private func openGamesTogether(with friend: UserSearchResult) {
-        pendingGamesFriendFilter = GameFriendFilterOption(friend: friend)
+    private func openGamesTogether(_ filter: GameFriendFilterOption) {
+        // Switch tabs first so GamesView is mounted and observing before the filter arrives.
         selectedTab = .games
+        Task { @MainActor in
+            await Task.yield()
+            pendingGamesFriendFilter = filter
+        }
     }
 }
 
 private struct OpenGamesTogetherKey: EnvironmentKey {
-    static let defaultValue: ((UserSearchResult) -> Void)? = nil
+    static let defaultValue: ((GameFriendFilterOption) -> Void)? = nil
 }
 
 extension EnvironmentValues {
-    var openGamesTogether: ((UserSearchResult) -> Void)? {
+    var openGamesTogether: ((GameFriendFilterOption) -> Void)? {
         get { self[OpenGamesTogetherKey.self] }
         set { self[OpenGamesTogetherKey.self] = newValue }
     }

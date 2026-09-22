@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		02AB8B528C8EAB73ACA3A172 /* NotificationsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 527701524E7F021576E1C366 /* NotificationsSheet.swift */; };
+		B2C3D4E5F60718293A4B5C6D /* LocalCompanionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* LocalCompanionDetailView.swift */; };
 		06862900DAA9B4D684369C7C /* SupabaseConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1C1EEEF147536A86FA7918D /* SupabaseConfig.swift */; };
 		152F612D51CAC8C0CE09D2AB /* GamesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10EFF30583873A3C431010B /* GamesView.swift */; };
 		16601929EE44440F57A36C47 /* InstagramPhotoGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A74C9001A61EAC55FD21B20 /* InstagramPhotoGrid.swift */; };
@@ -106,6 +107,7 @@
 		2A74C9001A61EAC55FD21B20 /* InstagramPhotoGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstagramPhotoGrid.swift; sourceTree = "<group>"; };
 		2FD03D4680527BB2A5C02B75 /* GameDatePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDatePicker.swift; sourceTree = "<group>"; };
 		2FD2AEED2ACD997796CF04DF /* FriendEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendEditorView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5C /* LocalCompanionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCompanionDetailView.swift; sourceTree = "<group>"; };
 		31FF4868E561A5AC2A108BCF /* SocialProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialProfileService.swift; sourceTree = "<group>"; };
 		3241C8F529EE5D60EFFD81EA /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		359D0910CC9F5497811C5554 /* FavoritePlayerOnboardingSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritePlayerOnboardingSearchView.swift; sourceTree = "<group>"; };
@@ -345,6 +347,7 @@
 				EAEFBA2241F9313B779424F1 /* InviteFriendSheet.swift */,
 				527701524E7F021576E1C366 /* NotificationsSheet.swift */,
 				7FE4C6ED44B0BCA31D8F66A7 /* PeopleView.swift */,
+				A1B2C3D4E5F60718293A4B5C /* LocalCompanionDetailView.swift */,
 				D1628947AD945E37A663F631 /* UserProfileView.swift */,
 			);
 			path = Social;
@@ -563,6 +566,7 @@
 				9FF1D06B528E0F401C6B01FC /* FollowActionButton.swift in Sources */,
 				BD713ED87A1E9C26C1A3AB75 /* FollowService.swift in Sources */,
 				2D55D4A639F305B40CD75922 /* FriendEditorView.swift in Sources */,
+				B2C3D4E5F60718293A4B5C6D /* LocalCompanionDetailView.swift in Sources */,
 				3F874332AFA34FEEEB649162 /* GameAttendanceFiltersBar.swift in Sources */,
 				E71EB47E9E92045F26041C45 /* GameDatePicker.swift in Sources */,
 				4FD5A4D2D1D96FEE40E12FEC /* GameDetailView.swift in Sources */,

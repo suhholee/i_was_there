@@ -20,8 +20,11 @@ enum KBOBoxscoreImporter {
 
         let awayResult = payload.teamRecords.first { $0.t_id == game.awayCode }?.result_sc
         let homeResult = payload.teamRecords.first { $0.t_id == game.homeCode }?.result_sc
-        let awayWon = awayResult == "W" || (awayResult != "L" && awayScore > homeScore)
-        let homeWon = homeResult == "W" || (homeResult != "L" && homeScore > awayScore)
+        // Sports2i `result_sc`: W / L / D (regular-season draws are common in KBO).
+        let isDraw = awayResult == "D" || homeResult == "D"
+            || (awayScore == homeScore && awayResult != "W" && homeResult != "W")
+        let awayWon = !isDraw && (awayResult == "W" || (awayResult != "L" && awayScore > homeScore))
+        let homeWon = !isDraw && (homeResult == "W" || (homeResult != "L" && homeScore > awayScore))
 
         let calendarDay = calendarDate(fromGDt: game.gDt) ?? Date()
         let pk = LeagueKey.syntheticPk(forKBOGameID: game.gameID)

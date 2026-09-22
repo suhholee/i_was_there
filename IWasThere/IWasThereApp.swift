@@ -27,7 +27,7 @@ struct IWasThereApp: App {
     }
 
     /// Bump when the SwiftData schema changes incompatibly (e.g. adding `GameFriend`).
-    private static let storeSchemaVersion = 8
+    private static let storeSchemaVersion = 10
     private static let schemaVersionKey = "IWasThereStoreSchemaVersion"
 
     private static func makeContainer() -> ModelContainer {

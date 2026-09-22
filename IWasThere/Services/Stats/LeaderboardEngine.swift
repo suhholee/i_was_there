@@ -392,7 +392,15 @@ enum LeaderboardEngine {
     struct AttendanceRecord: Equatable {
         let wins: Int
         let losses: Int
+        let draws: Int
 
+        init(wins: Int, losses: Int, draws: Int = 0) {
+            self.wins = wins
+            self.losses = losses
+            self.draws = draws
+        }
+
+        /// Decided games used for win% (KBO-style: draws excluded from denominator).
         var games: Int { wins + losses }
 
         var winPercentage: Double? {
@@ -401,7 +409,10 @@ enum LeaderboardEngine {
         }
 
         var recordLabel: String {
-            "\(wins)W \(losses)L"
+            if draws > 0 {
+                return "\(wins)W \(losses)L \(draws)D"
+            }
+            return "\(wins)W \(losses)L"
         }
 
         var winPercentageLabel: String {
@@ -416,6 +427,7 @@ enum LeaderboardEngine {
     ) -> AttendanceRecord {
         var wins = 0
         var losses = 0
+        var draws = 0
         for game in games {
             let favoriteTeamID: Int?
             switch game.resolvedLeague {
@@ -423,30 +435,32 @@ enum LeaderboardEngine {
             case .kbo: favoriteTeamID = kboFavoriteTeamID
             }
             guard let favoriteTeamID else { continue }
-            switch game.favoriteTeamWon(favoriteTeamID: favoriteTeamID) {
-            case true?: wins += 1
-            case false?: losses += 1
+            switch game.attendanceResult(favoriteTeamID: favoriteTeamID) {
+            case .win: wins += 1
+            case .lose: losses += 1
+            case .draw: draws += 1
             case nil: break
             }
         }
-        return AttendanceRecord(wins: wins, losses: losses)
+        return AttendanceRecord(wins: wins, losses: losses, draws: draws)
     }
 
     static func favoriteAttendance(
         games: [AttendedGame],
         favoriteTeamID: Int?
     ) -> AttendanceRecord {
-        guard let favoriteTeamID else { return AttendanceRecord(wins: 0, losses: 0) }
         var wins = 0
         var losses = 0
+        var draws = 0
         for game in games {
-            switch game.favoriteTeamWon(favoriteTeamID: favoriteTeamID) {
-            case true?: wins += 1
-            case false?: losses += 1
+            switch game.attendanceResult(favoriteTeamID: favoriteTeamID) {
+            case .win: wins += 1
+            case .lose: losses += 1
+            case .draw: draws += 1
             case nil: break
             }
         }
-        return AttendanceRecord(wins: wins, losses: losses)
+        return AttendanceRecord(wins: wins, losses: losses, draws: draws)
     }
 
     static func aggregates(

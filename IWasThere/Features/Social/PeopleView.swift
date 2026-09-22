@@ -20,10 +20,10 @@ struct PeopleView: View {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2
     }
 
-    private var rankedFriends: [RankedMutualFriend] {
+    private var rankedPeople: [PeopleRankItem] {
         let profile = profiles.first
-        return GameLogFilter.rankMutualFriends(
-            friends,
+        return GameLogFilter.rankPeople(
+            mutualFriends: friends,
             games: allGames,
             mlbFavoriteTeamID: profile?.favoriteTeamID,
             kboFavoriteTeamID: profile?.favoriteKBOTeamID,
@@ -69,47 +69,27 @@ struct PeopleView: View {
 
     @ViewBuilder
     private var friendsContent: some View {
-        if isLoadingFriends && friends.isEmpty {
+        if isLoadingFriends && friends.isEmpty && rankedPeople.isEmpty {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let friendsError, friends.isEmpty {
+        } else if let friendsError, friends.isEmpty && rankedPeople.isEmpty {
             ContentUnavailableView(
                 "Friends unavailable",
                 systemImage: "person.2.slash",
                 description: Text(friendsError)
             )
-        } else if friends.isEmpty {
+        } else if rankedPeople.isEmpty {
             ContentUnavailableView(
                 "No friends yet",
                 systemImage: "person.2",
-                description: Text("Search for people and follow each other to become friends.")
+                description: Text("Search for people and follow each other, or tag companions when you add a game.")
             )
         } else {
             List {
                 Section {
-                    ForEach(Array(rankedFriends.enumerated()), id: \.element.id) { index, rankedFriend in
-                        NavigationLink {
-                            UserProfileView(userId: rankedFriend.friend.userId)
-                        } label: {
-                            UserSearchRow(
-                                result: rankedFriend.friend,
-                                gamesTogether: rankedFriend.gamesTogether,
-                                togetherAttendance: rankedFriend.togetherAttendance,
-                                rankMode: friendRankMode,
-                                rankMedal: FriendRankMedal.forRank(index + 1),
-                                avatarRefreshToken: friendsRefreshToken
-                            )
-                        }
-                        .listRowBackground(DesignTokens.surface)
-                        .contextMenu {
-                            if rankedFriend.gamesTogether > 0 {
-                                Button {
-                                    openGamesTogether?(rankedFriend.friend)
-                                } label: {
-                                    Label("View games together", systemImage: "baseball")
-                                }
-                            }
-                        }
+                    let ranks = GameLogFilter.competitionRanks(for: rankedPeople, mode: friendRankMode)
+                    ForEach(Array(rankedPeople.enumerated()), id: \.element.id) { index, item in
+                        peopleRow(item, badge: FriendRankBadge.forCompetitionRank(ranks[index]))
                     }
                 } header: {
                     HStack(alignment: .center, spacing: 8) {
@@ -123,6 +103,65 @@ struct PeopleView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+        }
+    }
+
+    @ViewBuilder
+    private func peopleRow(_ item: PeopleRankItem, badge: FriendRankBadge?) -> some View {
+        switch item {
+        case .account(let rankedFriend):
+            NavigationLink {
+                UserProfileView(userId: rankedFriend.friend.userId)
+            } label: {
+                UserSearchRow(
+                    result: rankedFriend.friend,
+                    gamesTogether: rankedFriend.gamesTogether,
+                    togetherAttendance: rankedFriend.togetherAttendance,
+                    rankMode: friendRankMode,
+                    rankBadge: badge,
+                    avatarRefreshToken: friendsRefreshToken
+                )
+            }
+            .listRowBackground(DesignTokens.surface)
+            .contextMenu {
+                if rankedFriend.gamesTogether > 0 {
+                    Button {
+                        openGamesTogether?(GameFriendFilterOption(friend: rankedFriend.friend))
+                    } label: {
+                        Label("View games together", systemImage: "baseball")
+                    }
+                }
+            }
+
+        case .localCompanion(let companion):
+            NavigationLink {
+                LocalCompanionDetailView(companionName: companion.name)
+            } label: {
+                LocalCompanionRow(
+                    name: companion.name,
+                    gamesTogether: companion.gamesTogether,
+                    togetherAttendance: companion.togetherAttendance,
+                    rankMode: friendRankMode,
+                    rankBadge: badge
+                )
+            }
+            .listRowBackground(DesignTokens.surface)
+            .contextMenu {
+                if companion.gamesTogether > 0 {
+                    Button {
+                        openGamesTogether?(
+                            GameFriendFilterOption(
+                                id: "name:\(companion.name.lowercased())",
+                                chipLabel: companion.name,
+                                linkedUserId: nil,
+                                matchName: companion.name
+                            )
+                        )
+                    } label: {
+                        Label("View games together", systemImage: "baseball")
+                    }
+                }
+            }
         }
     }
 
@@ -225,28 +264,94 @@ struct PeopleView: View {
     }
 }
 
+struct FriendRankBadgeView: View {
+    let badge: FriendRankBadge
+
+    var body: some View {
+        switch badge {
+        case .medal(let medal):
+            Image(systemName: medal.systemImage)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(
+                    Color(
+                        red: medal.color.red,
+                        green: medal.color.green,
+                        blue: medal.color.blue
+                    )
+                )
+                .frame(width: 24)
+        case .number(let rank):
+            Text("\(rank)")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(DesignTokens.secondaryText)
+                .monospacedDigit()
+                .frame(width: 24)
+        }
+    }
+}
+
+struct LocalCompanionRow: View {
+    let name: String
+    var gamesTogether: Int?
+    var togetherAttendance: LeaderboardEngine.AttendanceRecord?
+    var rankMode: FriendListRankMode?
+    var rankBadge: FriendRankBadge?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let rankBadge {
+                FriendRankBadgeView(badge: rankBadge)
+            }
+
+            ProfileAvatarView(image: nil, diameter: 44)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name)
+                    .font(.headline)
+                    .foregroundStyle(DesignTokens.primaryText)
+                Text("No account linked")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.secondaryText)
+            }
+
+            Spacer(minLength: 8)
+
+            if let trailingLabel = trailingLabel {
+                Text(trailingLabel)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DesignTokens.secondaryText)
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var trailingLabel: String? {
+        guard let gamesTogether else { return nil }
+        switch rankMode {
+        case .winRate:
+            guard let togetherAttendance, togetherAttendance.games > 0 else { return "—" }
+            return togetherAttendance.winPercentageLabel
+        case .gamesTogether, nil:
+            return gamesTogether == 1 ? "1 game" : "\(gamesTogether) games"
+        }
+    }
+}
+
 struct UserSearchRow: View {
     let result: UserSearchResult
     var gamesTogether: Int?
     var togetherAttendance: LeaderboardEngine.AttendanceRecord?
     var rankMode: FriendListRankMode?
-    var rankMedal: FriendRankMedal?
+    var rankBadge: FriendRankBadge?
     var avatarRefreshToken: UUID = UUID()
     @State private var avatarImage: UIImage?
 
     var body: some View {
         HStack(spacing: 12) {
-            if let rankMedal {
-                Image(systemName: rankMedal.systemImage)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(
-                        Color(
-                            red: rankMedal.color.red,
-                            green: rankMedal.color.green,
-                            blue: rankMedal.color.blue
-                        )
-                    )
-                    .frame(width: 24)
+            if let rankBadge {
+                FriendRankBadgeView(badge: rankBadge)
             }
 
             RemoteProfileAvatarView(storagePath: result.avatarStoragePath, image: $avatarImage, diameter: 44)

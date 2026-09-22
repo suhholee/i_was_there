@@ -146,10 +146,11 @@ struct GamesView: View {
             .task(id: AuthSession.shared.isAuthenticated) {
                 await loadMutualFriends()
             }
-            .onChange(of: externalFriendFilter) { _, newValue in
-                guard let newValue else { return }
-                friendFilter = newValue
-                externalFriendFilter = nil
+            .onAppear {
+                applyExternalFriendFilterIfNeeded()
+            }
+            .onChange(of: externalFriendFilter) { _, _ in
+                applyExternalFriendFilterIfNeeded()
             }
             .task(id: games.map(\.mlbGamePk)) {
                 try? await Task.sleep(for: .milliseconds(300))
@@ -159,6 +160,12 @@ struct GamesView: View {
                 }
             }
         }
+    }
+
+    private func applyExternalFriendFilterIfNeeded() {
+        guard let pending = externalFriendFilter else { return }
+        friendFilter = pending
+        externalFriendFilter = nil
     }
 
     private func resetFilters() {
@@ -191,7 +198,7 @@ struct GamesView: View {
                     .foregroundStyle(DesignTokens.cardPrimaryText)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 8)
-                FavoriteResultBadge(won: game.favoriteTeamWon(favoriteTeamID: favoriteTeamID))
+                FavoriteResultBadge(outcome: game.displayResult(favoriteTeamID: favoriteTeamID))
             }
             Text("\(game.awayScore)–\(game.homeScore) · \(game.gameCardDateLabel)")
                 .font(.subheadline)
